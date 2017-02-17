@@ -22,13 +22,27 @@ const packages = Dict()
 for (i, pkg) in enumerate(names)
     path = joinpath(dir, pkg)
     urlf = joinpath(path, "url")
-    isfile(urlf) || continue
+    vers = joinpath(path, "versions")
+    isfile(urlf) && isdir(vers) || continue
+    versions = sort!(readdir(vers), by=VersionNumber)
+    isempty(versions) && continue
+    # we should emit a package entry
     url = readchomp(urlf)
     uuid = uuid5(uuid_julia, pkg)
-    print("""
+    println("""
     [$pkg]
     uuid = "$uuid"
     repository = "$url"
     """)
-    i < length(names) && println()
+    for (j, v) in enumerate(versions)
+        verd = joinpath(vers, v)
+        sha1f = joinpath(verd, "sha1")
+        isfile(sha1f) || continue
+        sha1 = readchomp(sha1f)
+        println("""
+            [[$pkg.version]]
+            version = "$v"
+            SHA1 = "$sha1"
+        """)
+    end
 end

@@ -14,6 +14,7 @@ function uuid5(namespace::UUID, key::String)
     u |= 0x00000000000050008000000000000000
     return UUID(u)
 end
+uuid5(namespace::UUID, key::AbstractString) = uuid5(namespace, String(key))
 
 const uuid_dns = UUID(0x6ba7b810_9dad_11d1_80b4_00c04fd430c8)
 const uuid_julia = uuid5(uuid_dns, "julialang.org")
@@ -31,26 +32,23 @@ for (i, pkg) in enumerate(names)
     versions[1] == "0.0.0" && shift!(versions)
     isempty(versions) && continue
     # emit package entry
-    url = readchomp(urlf)
-    uuid = uuid5(uuid_julia, pkg)
     println("""
     [$pkg]
-    uuid = "$uuid"
-    repository = "$url"
+    uuid = "$(uuid5(uuid_julia, pkg))"
+    repository = "$(readchomp(urlf))"
     """)
     for (j, v) in enumerate(versions)
         # emit version info
         verd = joinpath(vers, v)
         sha1f = joinpath(verd, "sha1")
         isfile(sha1f) || continue
-        sha1 = readchomp(sha1f)
         reqf = joinpath(verd, "requires")
-        reqs = Reqs.read(reqf)
+        reqs = filter!(r->isa(r,Requirement), Reqs.read(reqf))
         julias = mapreduce(
             r->r.versions,
             (a,b)->intersect(a,b),
             VersionSet(),
-            filter(r->isa(r,Requirement) && r.package == "julia", reqs)
+            filter(r->r.package == "julia", reqs),
         )
         @assert length(julias.intervals) == 1
         julia = julias.intervals[1]
@@ -63,11 +61,18 @@ for (i, pkg) in enumerate(names)
             [[$pkg.version]]
             version = "$v"
             julia = "$jver"
-            SHA1 = "$sha1"
+            SHA1 = "$(readchomp(sha1f))"
         """)
         # emit compatibility info
-
-        # println(STDOUT, reqs)
+        filter!(r->r.package != "julia", reqs)
+        sort!(reqs, by=r->r.package)
+        for r in reqs
+            println("""
+                    [$pkg.version.package.$(r.package)]
+                    uuid = "$(uuid5(uuid_julia, r.package))"
+                    versions = "$(r.versions)"
+            """)
+        end
         # break
     end
     # break

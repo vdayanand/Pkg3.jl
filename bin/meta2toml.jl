@@ -44,12 +44,13 @@ for (i, pkg) in enumerate(names)
         isfile(sha1f) || continue
         reqf = joinpath(verd, "requires")
         reqs = filter!(r->isa(r,Requirement), Reqs.read(reqf))
-        julias = mapreduce(
-            r->r.versions,
-            (a,b)->intersect(a,b),
-            VersionSet(),
-            filter(r->r.package == "julia", reqs),
-        )
+        reqd, sysd = Dict(), Dict()
+        for r in reqs
+            p, vs = r.package, r.versions
+            reqd[p] = haskey(reqd,p) ? intersect(reqd[p], r.versions) : r.versions
+            append!(get!(sysd, p, String[]), r.system)
+        end
+        julias = pop!(reqd, "julia", VersionSet())
         @assert length(julias.intervals) == 1
         julia = julias.intervals[1]
         jlo = Base.thisminor(max(julia.lower, v"0.1"))
@@ -64,14 +65,21 @@ for (i, pkg) in enumerate(names)
             SHA1 = "$(readchomp(sha1f))"
         """)
         # emit compatibility info
-        filter!(r->r.package != "julia", reqs)
-        sort!(reqs, by=r->r.package)
-        for r in reqs
-            println("""
-                    [$pkg.version.package.$(r.package)]
-                    uuid = "$(uuid5(uuid_julia, r.package))"
-                    versions = "$(r.versions)"
+        for p in sort!(collect(keys(reqd)))
+            print("""
+                    [$pkg.version.$p]
+                    uuid = "$(uuid5(uuid_julia, p))"
+                    versions = "$(reqd[p])"
             """)
+            sysp = sysd[p]
+            if length(sysp) > 0
+                systems = length(sysp) == 1 ? "\"$(sysp[1])\"" :
+                    """["$(join(unique(sort!(sysp)), "\", \""))"]"""
+                print("""
+                        os = $systems
+                """)
+            end
+            println()
         end
         # break
     end

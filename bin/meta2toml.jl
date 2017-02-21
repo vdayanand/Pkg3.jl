@@ -3,7 +3,7 @@
 using Base.Random: UUID
 using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
-using Base: thispatch, thisminor, nextminor
+using Base: thispatch, thisminor, nextpatch, nextminor
 using SHA
 
 function uuid5(namespace::UUID, key::String)
@@ -22,6 +22,23 @@ const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 const names = sort!(readdir(dir), by=lowercase)
 const vrange = Dict()
 
+function repr_versions(vs::Vector{VersionNumber})
+    out = String[]
+    isempty(vs) && return out
+    i = 0
+    lo = hi = vs[i += 1]
+    while i < length(vs)
+        v = vs[i += 1]
+        if v == nextpatch(hi)
+            hi = v
+        else
+            push!(out, lo == hi ? "$lo" : "$lo-$hi")
+            lo = hi = v
+        end
+    end
+    push!(out, lo == hi ? "$lo" : "$lo-$hi")
+end
+
 macro preamble()
     quote
         path = joinpath(dir, pkg)
@@ -36,7 +53,7 @@ end
 
 for (i, pkg) in enumerate(names)
     @preamble
-    vrange[pkg] = VersionInterval(first(versions), last(versions))
+    vrange[pkg] = versions
 end
 
 for (i, pkg) in enumerate(names)
@@ -65,9 +82,8 @@ for (i, pkg) in enumerate(names)
         julia = julias.intervals[1]
         jlo = thisminor(max(julia.lower, v"0.1"))
         jhi = thisminor(min(julia.upper, v"0.5"))
-        jver = jlo < jhi ?
-            "$(jlo.major).$(jlo.minor)-$(jhi.major).$(jhi.minor)" :
-            "$(jlo.major).$(jlo.minor)"
+        jver = jlo == jhi ? "$(jlo.major).$(jlo.minor)" :
+            "$(jlo.major).$(jlo.minor)-$(jhi.major).$(jhi.minor)"
         all(p->haskey(vrange, p), keys(reqd)) || continue
         println("""
             [[$pkg.version]]
@@ -79,14 +95,39 @@ for (i, pkg) in enumerate(names)
         for p in sort!(collect(keys(reqd)))
             vs = reqd[p]
             @assert length(vs.intervals) == 1
-            lo = thispatch(max(vs.intervals[1].lower, vrange[p].lower))
-            hi = thispatch(min(vs.intervals[1].upper, vrange[p].upper))
-            slo = lo.patch == 0 ? "$(lo.major).$(lo.minor)" : string(lo)
-            shi = hi.patch == 0 ? "$(hi.major).$(hi.minor)" : string(hi)
+            vsi = vs.intervals[1]
+            bef = filter(v->v < vsi.lower, vrange[p])
+            inc = filter(v->v in vsi,      vrange[p])
+            aft = filter(v->vsi.upper < v, vrange[p])
+            if isempty(inc)
+                lo, hi = typemin(VersionNumber), typemax(VersionNumber)
+                slo = shi = ""
+            else
+                ilo, ihi = first(inc), last(inc)
+                if isempty(bef) || last(bef) < thisminor(ilo)
+                    lo = thisminor(ilo)
+                    slo = "$(lo.major).$(lo.minor)"
+                else
+                    @assert last(bef) < thispatch(ilo)
+                    lo = thispatch(ilo)
+                    slo = "$lo"
+                end
+                if isempty(aft) || nextminor(ihi) <= first(aft)
+                    hi = thisminor(ihi)
+                    shi = "$(hi.major).$(hi.minor)"
+                else
+                    @assert nextpatch(ihi) <= first(aft)
+                    hi = thispatch(ihi)
+                    shi = "$hi"
+                end
+            end
             print("""
                     [$pkg.version.$p]
                     uuid = "$(uuid5(uuid_julia, p))"
-                    versions = "$(lo < hi ? "$slo-$shi" : "$slo")"
+                    bounds = "$vsi"
+                    excluded = $(repr_versions(bef ∪ aft))
+                    included = $(repr_versions(inc))
+                    versions = "$(slo == shi ? "$slo" : "$slo-$shi")"
             """)
             sysp = sysd[p]
             if length(sysp) > 0

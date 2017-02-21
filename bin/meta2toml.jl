@@ -3,9 +3,8 @@
 using Base.Random: UUID
 using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
-
+using Base: thispatch, thisminor, nextminor
 using SHA
-# using TOML # not the registered one, but https://github.com/StefanKarpinski/TOML.jl
 
 function uuid5(namespace::UUID, key::String)
     data = [reinterpret(UInt8, [namespace.value]); Vector{UInt8}(key)]
@@ -21,16 +20,27 @@ const uuid_julia = uuid5(uuid_dns, "julialang.org")
 
 const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 const names = sort!(readdir(dir), by=lowercase)
-const packages = Dict()
+const vrange = Dict()
+
+macro preamble()
+    quote
+        path = joinpath(dir, pkg)
+        urlf = joinpath(path, "url")
+        vers = joinpath(path, "versions")
+        isfile(urlf) && isdir(vers) || continue
+        versions = sort!(map(VersionNumber, readdir(vers)))
+        thispatch(versions[1]) == v"0.0.0" && shift!(versions)
+        isempty(versions) && continue
+    end |> esc
+end
 
 for (i, pkg) in enumerate(names)
-    path = joinpath(dir, pkg)
-    urlf = joinpath(path, "url")
-    vers = joinpath(path, "versions")
-    isfile(urlf) && isdir(vers) || continue
-    versions = sort!(readdir(vers), by=VersionNumber)
-    versions[1] == "0.0.0" && shift!(versions)
-    isempty(versions) && continue
+    @preamble
+    vrange[pkg] = VersionInterval(first(versions), last(versions))
+end
+
+for (i, pkg) in enumerate(names)
+    @preamble
     # emit package entry
     println("""
     [$pkg]
@@ -39,11 +49,11 @@ for (i, pkg) in enumerate(names)
     """)
     for (j, v) in enumerate(versions)
         # emit version info
-        verd = joinpath(vers, v)
+        verd = joinpath(vers, string(v))
         sha1f = joinpath(verd, "sha1")
         isfile(sha1f) || continue
         reqf = joinpath(verd, "requires")
-        reqs = filter!(r->isa(r,Requirement), Reqs.read(reqf))
+        reqs = filter!(r->isa(r, Requirement), Reqs.read(reqf))
         reqd, sysd = Dict(), Dict()
         for r in reqs
             p, vs = r.package, r.versions
@@ -53,11 +63,12 @@ for (i, pkg) in enumerate(names)
         julias = pop!(reqd, "julia", VersionSet())
         @assert length(julias.intervals) == 1
         julia = julias.intervals[1]
-        jlo = Base.thisminor(max(julia.lower, v"0.1"))
-        jhi = Base.thisminor(min(julia.upper, v"0.5"))
+        jlo = thisminor(max(julia.lower, v"0.1"))
+        jhi = thisminor(min(julia.upper, v"0.5"))
         jver = jlo < jhi ?
             "$(jlo.major).$(jlo.minor)-$(jhi.major).$(jhi.minor)" :
             "$(jlo.major).$(jlo.minor)"
+        all(p->haskey(vrange, p), keys(reqd)) || continue
         println("""
             [[$pkg.version]]
             version = "$v"
@@ -66,10 +77,16 @@ for (i, pkg) in enumerate(names)
         """)
         # emit compatibility info
         for p in sort!(collect(keys(reqd)))
+            vs = reqd[p]
+            @assert length(vs.intervals) == 1
+            lo = thispatch(max(vs.intervals[1].lower, vrange[p].lower))
+            hi = thispatch(min(vs.intervals[1].upper, vrange[p].upper))
+            slo = lo.patch == 0 ? "$(lo.major).$(lo.minor)" : string(lo)
+            shi = hi.patch == 0 ? "$(hi.major).$(hi.minor)" : string(hi)
             print("""
                     [$pkg.version.$p]
                     uuid = "$(uuid5(uuid_julia, p))"
-                    versions = "$(reqd[p])"
+                    versions = "$(lo < hi ? "$slo-$shi" : "$slo")"
             """)
             sysp = sysd[p]
             if length(sysp) > 0

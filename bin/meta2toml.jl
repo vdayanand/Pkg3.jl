@@ -121,13 +121,16 @@ for (i, pkg) in enumerate(names)
                     shi = "$hi"
                 end
             end
+            if lo <= hi
+                versions = repr(slo == shi ? "$slo" : "$slo-$shi")
+            else
+                m = "$(lo.major).$(lo.minor)"
+                versions = "[\"$shi\", \"!$m.0-$m.$(lo.patch-1)\"]"
+            end
             print("""
                     [$pkg.version.$p]
                     uuid = "$(uuid5(uuid_julia, p))"
-                    bounds = "$vsi"
-                    excluded = $(repr_versions(bef ∪ aft))
-                    included = $(repr_versions(inc))
-                    versions = "$(slo == shi ? "$slo" : "$slo-$shi")"
+                    versions = $versions
             """)
             sysp = sysd[p]
             if length(sysp) > 0

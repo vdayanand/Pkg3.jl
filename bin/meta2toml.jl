@@ -86,9 +86,24 @@ function load_packages(dir::String)
     return packages
 end
 
-dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
+macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 
+function prune!(packages::Associative{String,Package})
+    while true
+        clean = true
+        filter!(packages) do p, pkg
+            filter!(pkg.versions) do v, ver
+                @clean thispatch(v) > v"0.0.0"
+            end
+            @clean !isempty(pkg.versions)
+        end
+        clean && return packages
+    end
+end
+
+dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)
+prune!(packages)
 
 
 function version_range(vi::VersionInterval, vs::Vector{VersionNumber})

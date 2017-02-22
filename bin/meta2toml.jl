@@ -96,41 +96,40 @@ for (i, pkg) in enumerate(names)
             vs = reqd[p]
             @assert length(vs.intervals) == 1
             vsi = vs.intervals[1]
-            bef = filter(v->v < vsi.lower, vrange[p])
-            inc = filter(v->v in vsi,      vrange[p])
-            aft = filter(v->vsi.upper < v, vrange[p])
+            bef = filter(v->v < vsi.lower,  vrange[p])
+            inc = filter(v->v in vsi,       vrange[p])
+            aft = filter(v->vsi.upper <= v, vrange[p])
             if isempty(inc)
                 lo, hi = typemin(VersionNumber), typemax(VersionNumber)
                 slo = shi = ""
             else
                 ilo, ihi = first(inc), last(inc)
-                if isempty(bef) || last(bef) < thisminor(ilo)
+                shortlo = isempty(bef) || last(bef) < thisminor(ilo)
+                shorthi = isempty(aft) || nextminor(ihi) <= first(aft)
+                if shortlo
                     lo = thisminor(ilo)
                     slo = "$(lo.major).$(lo.minor)"
+                    shorthi || (slo *= ".*")
                 else
                     @assert last(bef) < thispatch(ilo)
                     lo = thispatch(ilo)
                     slo = "$lo"
                 end
-                if isempty(aft) || nextminor(ihi) <= first(aft)
+                if shorthi
                     hi = thisminor(ihi)
                     shi = "$(hi.major).$(hi.minor)"
+                    shortlo || (shi *= ".*")
                 else
                     @assert nextpatch(ihi) <= first(aft)
                     hi = thispatch(ihi)
                     shi = "$hi"
                 end
             end
-            if lo <= hi
-                versions = repr(slo == shi ? "$slo" : "$slo-$shi")
-            else
-                m = "$(lo.major).$(lo.minor)"
-                versions = "[\"$shi\", \"!$m.0-$m.$(lo.patch-1)\"]"
-            end
+            vstr = slo == shi ? "$slo" : "$slo-$shi"
             print("""
                     [$pkg.version.$p]
                     uuid = "$(uuid5(uuid_julia, p))"
-                    versions = $versions
+                    versions = "$vstr"
             """)
             sysp = sysd[p]
             if length(sysp) > 0

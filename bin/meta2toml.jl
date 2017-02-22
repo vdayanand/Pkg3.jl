@@ -22,21 +22,29 @@ const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 const names = sort!(readdir(dir), by=lowercase)
 const vrange = Dict()
 
-function repr_versions(vs::Vector{VersionNumber})
-    out = String[]
-    isempty(vs) && return out
-    i = 0
-    lo = hi = vs[i += 1]
-    while i < length(vs)
-        v = vs[i += 1]
-        if v == nextpatch(hi)
-            hi = v
-        else
-            push!(out, lo == hi ? "$lo" : "$lo-$hi")
-            lo = hi = v
-        end
+function version_range(vi::VersionInterval, vs::Vector{VersionNumber})
+    bef = filter(v->v < vi.lower,  vs)
+    inc = filter(v->v in vi,       vs)
+    aft = filter(v->vi.upper <= v, vs)
+    isempty(inc) && return ""
+    lo, hi = first(inc), last(inc)
+    shortlo = isempty(bef) || last(bef) < thisminor(lo)
+    shorthi = isempty(aft) || nextminor(hi) <= first(aft)
+    if shortlo
+        slo = "$(lo.major).$(lo.minor)"
+        shorthi || (slo *= ".*")
+    else
+        @assert last(bef) < thispatch(lo)
+        slo = "$(thispatch(lo))"
     end
-    push!(out, lo == hi ? "$lo" : "$lo-$hi")
+    if shorthi
+        shi = "$(hi.major).$(hi.minor)"
+        shortlo || (shi *= ".*")
+    else
+        @assert nextpatch(hi) <= first(aft)
+        shi = "$(thispatch(hi))"
+    end
+    return slo == shi ? slo : "$slo-$shi"
 end
 
 macro preamble()
@@ -95,41 +103,10 @@ for (i, pkg) in enumerate(names)
         for p in sort!(collect(keys(reqd)))
             vs = reqd[p]
             @assert length(vs.intervals) == 1
-            vsi = vs.intervals[1]
-            bef = filter(v->v < vsi.lower,  vrange[p])
-            inc = filter(v->v in vsi,       vrange[p])
-            aft = filter(v->vsi.upper <= v, vrange[p])
-            if isempty(inc)
-                lo, hi = typemin(VersionNumber), typemax(VersionNumber)
-                slo = shi = ""
-            else
-                ilo, ihi = first(inc), last(inc)
-                shortlo = isempty(bef) || last(bef) < thisminor(ilo)
-                shorthi = isempty(aft) || nextminor(ihi) <= first(aft)
-                if shortlo
-                    lo = thisminor(ilo)
-                    slo = "$(lo.major).$(lo.minor)"
-                    shorthi || (slo *= ".*")
-                else
-                    @assert last(bef) < thispatch(ilo)
-                    lo = thispatch(ilo)
-                    slo = "$lo"
-                end
-                if shorthi
-                    hi = thisminor(ihi)
-                    shi = "$(hi.major).$(hi.minor)"
-                    shortlo || (shi *= ".*")
-                else
-                    @assert nextpatch(ihi) <= first(aft)
-                    hi = thispatch(ihi)
-                    shi = "$hi"
-                end
-            end
-            vstr = slo == shi ? "$slo" : "$slo-$shi"
             print("""
                     [$pkg.version.$p]
                     uuid = "$(uuid5(uuid_julia, p))"
-                    versions = "$vstr"
+                    versions = "$(version_range(vs.intervals[1], vrange[p]))"
             """)
             sysp = sysd[p]
             if length(sysp) > 0

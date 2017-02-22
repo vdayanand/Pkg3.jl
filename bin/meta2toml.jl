@@ -4,7 +4,10 @@ using Base.Random: UUID
 using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
+using DataStructures: OrderedDict
 using SHA
+
+## Computing UUID5 values from (namespace, key) pairs ##
 
 function uuid5(namespace::UUID, key::String)
     data = [reinterpret(UInt8, [namespace.value]); Vector{UInt8}(key)]
@@ -18,9 +21,75 @@ uuid5(namespace::UUID, key::AbstractString) = uuid5(namespace, String(key))
 const uuid_dns = UUID(0x6ba7b810_9dad_11d1_80b4_00c04fd430c8)
 const uuid_julia = uuid5(uuid_dns, "julialang.org")
 
-const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
-const names = sort!(readdir(dir), by=lowercase)
-const vrange = Dict()
+## Loading data into various data structures ##
+
+const julia_range = VersionInterval(v"0.1", v"0.5")
+
+struct Require
+    versions::VersionInterval
+    systems::Vector{Symbol}
+end
+
+struct Version
+    sha1::String
+    julia::VersionInterval
+    requires::OrderedDict{String,Require}
+    Version(sha1, julia, requires) = new(sha1, julia_range ∩ julia, requires)
+end
+
+struct Package
+    uuid::UUID
+    url::String
+    versions::OrderedDict{VersionNumber,Version}
+end
+
+function load_requires(path::String)
+    requires = OrderedDict{String,Require}()
+    isfile(path) || return requires
+    reqs = filter!(r->r isa Requirement, Reqs.read(path))
+    for r in sort!(reqs, by=r->r.package)
+        @assert length(r.versions.intervals) == 1
+        requires[r.package] = !haskey(requires, r.package) ?
+            Require(r.versions.intervals[1], r.system) :
+            Require(
+                requires[r.package].versions ∩ r.versions.intervals[1],
+                requires[r.package].systems  ∪ r.system,
+            )
+    end
+    return requires
+end
+
+function load_versions(dir::String)
+    versions = OrderedDict{VersionNumber,Version}()
+    isdir(dir) || return versions
+    for ver in sort!(map(VersionNumber, readdir(dir)))
+        path = joinpath(dir, string(ver))
+        sha1 = joinpath(path, "sha1")
+        isfile(sha1) || continue
+        requires = load_requires(joinpath(path, "requires"))
+        julia = pop!(requires, "julia", Require(VersionInterval(),[]))
+        @assert isempty(julia.systems)
+        versions[ver] = Version(readchomp(sha1), julia.versions, requires)
+    end
+    return versions
+end
+
+function load_packages(dir::String)
+    packages = OrderedDict{String,Package}()
+    for pkg in sort!(readdir(dir), by=lowercase)
+        path = joinpath(dir, pkg)
+        url = joinpath(path, "url")
+        versions = joinpath(path, "versions")
+        isfile(url) || continue
+        packages[pkg] = Package(uuid5(uuid_julia, pkg), readchomp(url), load_versions(versions))
+    end
+    return packages
+end
+
+dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
+
+packages = load_packages(dir)
+
 
 function version_range(vi::VersionInterval, vs::Vector{VersionNumber})
     bef = filter(v->v < vi.lower,  vs)

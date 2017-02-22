@@ -93,7 +93,13 @@ function prune!(packages::Associative{String,Package})
         clean = true
         filter!(packages) do p, pkg
             filter!(pkg.versions) do v, ver
-                @clean thispatch(v) > v"0.0.0"
+                @clean thispatch(v) > v"0.0.0" &&
+                all(ver.requires) do kv
+                    r, req = kv
+                    haskey(packages, r) && any(keys(packages[r].versions)) do v′
+                        v′ in req.versions
+                    end
+                end
             end
             @clean !isempty(pkg.versions)
         end

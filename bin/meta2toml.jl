@@ -4,7 +4,6 @@ using Base.Random: UUID
 using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
-using DataStructures: OrderedDict
 using SHA
 
 ## Computing UUID5 values from (namespace, key) pairs ##
@@ -31,15 +30,11 @@ end
 struct Version
     sha1::String
     julia::Pair{VersionNumber}
-    requires::OrderedDict{String,Require}
+    requires::Dict{String,Require}
 
-    function Version(sha1::AbstractString, julia::VersionInterval, requires::OrderedDict{String,Require})
+    function Version(sha1::AbstractString, julia::VersionInterval, requires::Dict{String,Require})
         julias = filter!(v->v in julia, [v"0.1", v"0.2", v"0.3", v"0.4", v"0.5"])
-        if isempty(julias)
-            lo, hi = v"0.5", v"0.1" # lo > hi indicates emptiness
-        else
-            lo, hi = extrema(julias)
-        end
+        (lo, hi) = isempty(julias) ? (v"0.5", v"0.1") : extrema(julias)
         new(sha1, lo => hi, requires)
     end
 end
@@ -47,14 +42,13 @@ end
 struct Package
     uuid::UUID
     url::String
-    versions::OrderedDict{VersionNumber,Version}
+    versions::Dict{VersionNumber,Version}
 end
 
 function load_requires(path::String)
-    requires = OrderedDict{String,Require}()
+    requires = Dict{String,Require}()
     isfile(path) || return requires
-    reqs = filter!(r->r isa Requirement, Reqs.read(path))
-    for r in sort!(reqs, by=r->r.package)
+    for r in filter!(r->r isa Requirement, Reqs.read(path))
         @assert length(r.versions.intervals) == 1
         requires[r.package] = !haskey(requires, r.package) ?
             Require(r.versions.intervals[1], r.system) :
@@ -67,23 +61,23 @@ function load_requires(path::String)
 end
 
 function load_versions(dir::String)
-    versions = OrderedDict{VersionNumber,Version}()
+    versions = Dict{VersionNumber,Version}()
     isdir(dir) || return versions
-    for ver in sort!(map(VersionNumber, readdir(dir)))
-        path = joinpath(dir, string(ver))
+    for ver in readdir(dir)
+        path = joinpath(dir, ver)
         sha1 = joinpath(path, "sha1")
         isfile(sha1) || continue
         requires = load_requires(joinpath(path, "requires"))
         julia = pop!(requires, "julia", Require(VersionInterval(),[]))
         @assert isempty(julia.systems)
-        versions[ver] = Version(readchomp(sha1), julia.versions, requires)
+        versions[VersionNumber(ver)] = Version(readchomp(sha1), julia.versions, requires)
     end
     return versions
 end
 
 function load_packages(dir::String)
-    packages = OrderedDict{String,Package}()
-    for pkg in sort!(readdir(dir), by=lowercase)
+    packages = Dict{String,Package}()
+    for pkg in readdir(dir)
         path = joinpath(dir, pkg)
         url = joinpath(path, "url")
         versions = joinpath(path, "versions")
@@ -101,7 +95,7 @@ function prune!(packages::Associative{String,Package})
         filter!(packages) do p, pkg
             filter!(pkg.versions) do v, ver
                 @clean thispatch(v) > v"0.0.0" &&
-                # ver.julia.first <= ver.julia.second &&
+                ver.julia.first <= ver.julia.second &&
                 all(ver.requires) do kv
                     r, req = kv
                     haskey(packages, r) &&

@@ -23,8 +23,6 @@ const uuid_julia = uuid5(uuid_dns, "julialang.org")
 
 ## Loading data into various data structures ##
 
-const julia_range = VersionInterval(v"0.1", v"0.5")
-
 struct Require
     versions::VersionInterval
     systems::Vector{Symbol}
@@ -32,9 +30,18 @@ end
 
 struct Version
     sha1::String
-    julia::VersionInterval
+    julia::Pair{VersionNumber}
     requires::OrderedDict{String,Require}
-    Version(sha1, julia, requires) = new(sha1, julia_range ∩ julia, requires)
+
+    function Version(sha1::AbstractString, julia::VersionInterval, requires::OrderedDict{String,Require})
+        julias = filter!(v->v in julia, [v"0.1", v"0.2", v"0.3", v"0.4", v"0.5"])
+        if isempty(julias)
+            lo, hi = v"0.5", v"0.1" # lo > hi indicates emptiness
+        else
+            lo, hi = extrema(julias)
+        end
+        new(sha1, lo => hi, requires)
+    end
 end
 
 struct Package
@@ -94,11 +101,11 @@ function prune!(packages::Associative{String,Package})
         filter!(packages) do p, pkg
             filter!(pkg.versions) do v, ver
                 @clean thispatch(v) > v"0.0.0" &&
+                # ver.julia.first <= ver.julia.second &&
                 all(ver.requires) do kv
                     r, req = kv
-                    haskey(packages, r) && any(keys(packages[r].versions)) do v′
-                        v′ in req.versions
-                    end
+                    haskey(packages, r) &&
+                    any(w->w in req.versions, keys(packages[r].versions))
                 end
             end
             @clean !isempty(pkg.versions)
@@ -111,7 +118,7 @@ dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)
 prune!(packages)
 
-
+#=
 function version_range(vi::VersionInterval, vs::Vector{VersionNumber})
     bef = filter(v->v < vi.lower,  vs)
     inc = filter(v->v in vi,       vs)
@@ -212,3 +219,4 @@ for (i, pkg) in enumerate(names)
     end
     # break
 end
+=#

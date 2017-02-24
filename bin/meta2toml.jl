@@ -29,14 +29,8 @@ end
 
 struct Version
     sha1::String
-    julia::Pair{VersionNumber}
+    julia::VersionInterval
     requires::Dict{String,Require}
-
-    function Version(sha1::AbstractString, julia::VersionInterval, requires::Dict{String,Require})
-        julias = filter!(v->v in julia, [v"0.1", v"0.2", v"0.3", v"0.4", v"0.5"])
-        (lo, hi) = isempty(julias) ? (v"0.5", v"0.1") : extrema(julias)
-        new(sha1, lo => hi, requires)
-    end
 end
 
 struct Package
@@ -50,12 +44,13 @@ function load_requires(path::String)
     isfile(path) || return requires
     for r in filter!(r->r isa Requirement, Reqs.read(path))
         @assert length(r.versions.intervals) == 1
-        requires[r.package] = !haskey(requires, r.package) ?
-            Require(r.versions.intervals[1], r.system) :
-            Require(
-                requires[r.package].versions ∩ r.versions.intervals[1],
-                requires[r.package].systems  ∪ r.system,
-            )
+        new = haskey(requires, r.package)
+        versions, systems = r.versions.intervals[1], r.system
+        if haskey(requires, r.package)
+            versions = versions ∩ requires[r.package].versions
+            systems  = systems  ∪ requires[r.package].systems
+        end
+        requires[r.package] = Require(versions, systems)
     end
     return requires
 end
@@ -68,7 +63,7 @@ function load_versions(dir::String)
         sha1 = joinpath(path, "sha1")
         isfile(sha1) || continue
         requires = load_requires(joinpath(path, "requires"))
-        julia = pop!(requires, "julia", Require(VersionInterval(),[]))
+        julia = pop!(requires, "julia", Require(VersionInterval(v"0.1", v"0.6"), []))
         @assert isempty(julia.systems)
         versions[VersionNumber(ver)] = Version(readchomp(sha1), julia.versions, requires)
     end
@@ -95,7 +90,6 @@ function prune!(packages::Associative{String,Package})
         filter!(packages) do p, pkg
             filter!(pkg.versions) do v, ver
                 @clean thispatch(v) > v"0.0.0" &&
-                ver.julia.first <= ver.julia.second &&
                 all(ver.requires) do kv
                     r, req = kv
                     haskey(packages, r) &&
@@ -111,6 +105,32 @@ end
 dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)
 prune!(packages)
+
+function print_package_metadata(pkg, p)
+    print("""
+    [$pkg]
+    uuid = "$(p.uuid)"
+    repository = "$(p.url)"
+
+    """)
+end
+
+function print_versions_sha1(pkg, p)
+    print("""
+        [$pkg.versions.sha1]
+    """)
+    for (ver, v) in sort!(collect(p.versions), by=first)
+        print("""
+            $ver = "$(v.sha1)"
+        """)
+    end
+    println()
+end
+
+for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
+    print_package_metadata(pkg, p)
+    print_versions_sha1(pkg, p)
+end
 
 #=
 function version_range(vi::VersionInterval, vs::Vector{VersionNumber})

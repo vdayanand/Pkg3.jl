@@ -127,6 +127,64 @@ function print_versions_sha1(pkg, p)
     println()
 end
 
+const julia_versions = [VersionNumber(0,m) for m=1:5]
+
+function print_versions_julia(pkg, p)
+    print("""
+        [$pkg.versions.julia]
+    """)
+    for (ver, v) in sort!(collect(p.versions), by=first)
+        print("""
+            $ver = "$(v.sha1)"
+        """)
+    end
+    println()
+end
+
+≲(v::VersionNumber, t::NTuple{0,Int}) = true
+≲(v::VersionNumber, t::NTuple{1,Int}) = v.major <= t[1]
+≲(v::VersionNumber, t::NTuple{2,Int}) = v.major <= t[1] && v.minor <= t[2]
+≲(v::VersionNumber, t::NTuple{3,Int}) = v.major <= t[1] && v.minor <= t[2] && v.patch <= t[3]
+
+≲(t::NTuple{0,Int}, v::VersionNumber) = true
+≲(t::NTuple{1,Int}, v::VersionNumber) = t[1] <= v.major
+≲(t::NTuple{2,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor
+≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
+
+∈(v::VersionNumber, t::NTuple{n,Int}) where {n} = t ≲ v ≲ t
+
+function compress_versions(exc::Vector{VersionNumber}, inc::Vector{VersionNumber})
+    @assert issorted(exc) && issorted(inc)
+    tuples = Tuple[]
+    for v in inc
+        found = false
+        for t in ((), (v.major,), (v.major,v.minor), (v.major,v.minor,v.patch))
+            any(w ∈ t for w in exc) && continue
+            if !isempty(tuples) && !any(tuples[end] ≲ w ≲ t for w in exc)
+                # can be merged with the last one
+                tuples[end] = t
+            else
+                push!(tuples, t, t)
+            end
+            found = true
+            break
+        end
+        @assert found
+    end
+    return tuples
+end
+
+function compress_version_map(fwd::Dict{VersionNumber,V}) where V
+    rev = Dict{V,Vector{VersionNumber}}()
+    versions = VersionNumber[]
+    for (v, x) in fwd
+        push!(get!(rev, x, VersionNumber[]), v)
+        push!(versions, v)
+    end
+
+    return rev
+end
+
 for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
     print_package_metadata(pkg, p)
     print_versions_sha1(pkg, p)

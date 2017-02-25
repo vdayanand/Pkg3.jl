@@ -102,45 +102,6 @@ function prune!(packages::Associative{String,Package})
     end
 end
 
-dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
-packages = load_packages(dir)
-prune!(packages)
-
-function print_package_metadata(pkg, p)
-    print("""
-    [$pkg]
-    uuid = "$(p.uuid)"
-    repository = "$(p.url)"
-
-    """)
-end
-
-function print_versions_sha1(pkg, p)
-    print("""
-        [$pkg.versions.sha1]
-    """)
-    for (ver, v) in sort!(collect(p.versions), by=first)
-        print("""
-            $ver = "$(v.sha1)"
-        """)
-    end
-    println()
-end
-
-const julia_versions = [VersionNumber(0,m) for m=1:5]
-
-function print_versions_julia(pkg, p)
-    print("""
-        [$pkg.versions.julia]
-    """)
-    for (ver, v) in sort!(collect(p.versions), by=first)
-        print("""
-            $ver = "$(v.sha1)"
-        """)
-    end
-    println()
-end
-
 ≲(v::VersionNumber, t::NTuple{0,Int}) = true
 ≲(v::VersionNumber, t::NTuple{1,Int}) = v.major <= t[1]
 ≲(v::VersionNumber, t::NTuple{2,Int}) = v.major <= t[1] && v.minor <= t[2]
@@ -151,9 +112,11 @@ end
 ≲(t::NTuple{2,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor
 ≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
 
-version_string(t::NTuple{m,Int}, n::Int) where {m} = join([i ≤ m ? t[i] : "*" for i = 1:n], ".")
-version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} =
-    a == b ? version_string(a) : "$(version_string(a,max(m,n)))-$(version_string(b,max(m,n)))"
+version_string(t::NTuple{m,Int}, n::Int) where {m} =
+    join([i ≤ m ? t[i] : "*" for i = 1:max(1,n)], ".")
+
+version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} = a == b ? version_string(a,m) :
+    "$(version_string(a,max(m,n)))-$(version_string(b,max(m,n)))"
 
 function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
     @assert issorted(inc) && issorted(exc)
@@ -174,20 +137,69 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
     [version_string(tuples[i], tuples[i+1]) for i = 1:2:length(tuples)]
 end
 
-function compress_version_map(fwd::Dict{VersionNumber,V}) where V
-    rev = Dict{V,Vector{VersionNumber}}()
+function compress_version_map(fwd::Dict{VersionNumber,X}) where X
+    rev = Dict{X,Vector{VersionNumber}}()
     versions = VersionNumber[]
     for (v, x) in fwd
         push!(get!(rev, x, VersionNumber[]), v)
         push!(versions, v)
     end
-
-    return rev
+    sort!(versions)
+    compressed = Dict{String,X}()
+    for (x, inc) in rev
+        sort!(inc)
+        exc = setdiff(versions, inc)
+        for r in compress_versions(inc, exc)
+            compressed[r] = x
+        end
+    end
+    return compressed
 end
+
+function print_package_metadata(pkg::String, p::Package)
+    print("""
+    [$pkg]
+    uuid = "$(p.uuid)"
+    repository = "$(p.url)"
+
+    """)
+end
+
+function print_versions_sha1(pkg::String, p::Package)
+    print("""
+        [$pkg.versions.sha1]
+    """)
+    for (ver, v) in sort!(collect(p.versions), by=first)
+        print("""
+            $ver = "$(v.sha1)"
+        """)
+    end
+    println()
+end
+
+const julia_versions = [VersionNumber(0,m) for m=1:5]
+
+function print_versions_julia(pkg::String, p::Package)
+    print("""
+        [$pkg.versions.julia]
+    """)
+    d = Dict(ver => v.julia for (ver, v) in p.versions)
+    for (ver, v) in compress_version_map(d)
+        print("""
+            "$ver" = "$v"
+        """)
+    end
+    println()
+end
+
+dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
+packages = load_packages(dir)
+prune!(packages)
 
 for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
     print_package_metadata(pkg, p)
     print_versions_sha1(pkg, p)
+    print_versions_julia(pkg, p)
 end
 
 #=

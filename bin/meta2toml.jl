@@ -113,7 +113,7 @@ end
 ≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
 
 version_string(t::NTuple{m,Int}, n::Int) where {m} =
-    join([i ≤ m ? t[i] : "*" for i = 1:max(1,n)], ".")
+    join([i ≤ m ? t[i] : "*" for i = 1:max(1,min(n,m+1))], ".")
 
 version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} = a == b ? version_string(a,m) :
     "$(version_string(a,max(m,n)))-$(version_string(b,max(m,n)))"
@@ -134,7 +134,7 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
             tuples[end] = hi # can be merged with last
         end
     end
-    [version_string(tuples[i], tuples[i+1]) for i = 1:2:length(tuples)]
+    [tuples[i] => tuples[i+1] for i = 1:2:length(tuples)]
 end
 
 function compress_version_map(fwd::Dict{VersionNumber,X}) where X
@@ -145,7 +145,7 @@ function compress_version_map(fwd::Dict{VersionNumber,X}) where X
         push!(versions, v)
     end
     sort!(versions)
-    compressed = Dict{String,X}()
+    compressed = Dict{Pair,X}()
     for (x, inc) in rev
         sort!(inc)
         exc = setdiff(versions, inc)
@@ -184,7 +184,8 @@ function print_versions_julia(pkg::String, p::Package)
         [$pkg.versions.julia]
     """)
     d = Dict(ver => v.julia for (ver, v) in p.versions)
-    for (ver, v) in compress_version_map(d)
+    for (tp, v) in sort!(collect(compress_version_map(d)), by=first∘first)
+        ver = version_string(tp...)
         print("""
             "$ver" = "$v"
         """)

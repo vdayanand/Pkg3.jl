@@ -151,28 +151,27 @@ end
 ≲(t::NTuple{2,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor
 ≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
 
-∈(v::VersionNumber, t::NTuple{n,Int}) where {n} = t ≲ v ≲ t
+version_string(t::NTuple{m,Int}, n::Int) where {m} = join([i ≤ m ? t[i] : "*" for i = 1:n], ".")
+version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} =
+    a == b ? version_string(a) : "$(version_string(a,max(m,n)))-$(version_string(b,max(m,n)))"
 
 function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
     @assert issorted(inc) && issorted(exc)
     @assert isempty(inc ∩ exc)
     tuples = Tuple[]
     for v in inc
-        found = false
-        for t in ((), (v.major,), (v.major,v.minor), (v.major,v.minor,v.patch))
-            any(w ∈ t for w in exc) && continue
-            if !isempty(tuples) && !any(tuples[end-1] ≲ w ≲ t for w in exc)
-                # can be merged with the last one
-                tuples[end] = t
-            else
-                push!(tuples, t, t)
-            end
-            found = true
-            break
+        lo = hi = (v.major,v.minor,v.patch)
+        for t in ((v.major,v.minor), (v.major,), ())
+            !any(t ≲ w ≤ v for w in exc) && (lo = t)
+            !any(v ≤ w ≲ t for w in exc) && (hi = t)
         end
-        @assert found
+        if isempty(tuples) || any(tuples[end-1] ≲ w ≲ hi for w in exc)
+            push!(tuples, lo, hi) # need a new interval
+        else
+            tuples[end] = hi # can be merged with last
+        end
     end
-    return tuples
+    [version_string(tuples[i], tuples[i+1]) for i = 1:2:length(tuples)]
 end
 
 function compress_version_map(fwd::Dict{VersionNumber,V}) where V

@@ -153,14 +153,15 @@ end
 
 ∈(v::VersionNumber, t::NTuple{n,Int}) where {n} = t ≲ v ≲ t
 
-function compress_versions(exc::Vector{VersionNumber}, inc::Vector{VersionNumber})
-    @assert issorted(exc) && issorted(inc)
+function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
+    @assert issorted(inc) && issorted(exc)
+    @assert isempty(inc ∩ exc)
     tuples = Tuple[]
     for v in inc
         found = false
         for t in ((), (v.major,), (v.major,v.minor), (v.major,v.minor,v.patch))
             any(w ∈ t for w in exc) && continue
-            if !isempty(tuples) && !any(tuples[end] ≲ w ≲ t for w in exc)
+            if !isempty(tuples) && !any(tuples[end-1] ≲ w ≲ t for w in exc)
                 # can be merged with the last one
                 tuples[end] = t
             else

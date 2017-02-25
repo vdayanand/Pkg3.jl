@@ -113,10 +113,14 @@ end
 ≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
 
 version_string(p::Pair) = version_string(p...)
-version_string(t::NTuple{m,Int}, n::Int) where {m} =
-    join([i ≤ m ? t[i] : "*" for i = 1:max(1,min(n,m+1))], ".")
-version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} = a == b ? version_string(a,m) :
-    "$(version_string(a,max(m,n)))-$(version_string(b,max(m,n)))"
+
+function version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n}
+    m == n == 0 && return "*"
+    lo, hi = join(a, "."), join(b, ".")
+    a == b ? (m ≥ 3 ? lo : "$lo.*") :
+    m == 0 ? "≤$hi" :
+    n == 0 ? "≥$lo" : "≥$lo ≤$hi"
+end
 
 function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
     @assert issorted(inc) && issorted(exc)

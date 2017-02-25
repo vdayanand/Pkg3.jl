@@ -112,9 +112,9 @@ end
 ≲(t::NTuple{2,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor
 ≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
 
+version_string(p::Pair) = version_string(p...)
 version_string(t::NTuple{m,Int}, n::Int) where {m} =
     join([i ≤ m ? t[i] : "*" for i = 1:max(1,min(n,m+1))], ".")
-
 version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} = a == b ? version_string(a,m) :
     "$(version_string(a,max(m,n)))-$(version_string(b,max(m,n)))"
 
@@ -179,15 +179,22 @@ end
 
 const julia_versions = [VersionNumber(0,m) for m=1:5]
 
+function compress_julia_versions(julia::VersionInterval)
+    inc = filter(v->v in julia, julia_versions)
+    exc = setdiff(julia_versions, inc)
+    compress_versions(inc, exc)
+end
+
 function print_versions_julia(pkg::String, p::Package)
     print("""
         [$pkg.versions.julia]
     """)
-    d = Dict(ver => v.julia for (ver, v) in p.versions)
+    d = Dict(ver => compress_julia_versions(v.julia) for (ver, v) in p.versions)
     for (tp, v) in sort!(collect(compress_version_map(d)), by=first∘first)
-        ver = version_string(tp...)
+        lhs = version_string(tp)
+        rhs = "\"" * join(map(version_string, v), "\", \"") * "\""
         print("""
-            "$ver" = "$v"
+            "$lhs" = $rhs
         """)
     end
     println()

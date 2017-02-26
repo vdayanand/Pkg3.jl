@@ -113,13 +113,26 @@ end
 ≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
 
 version_string(p::Pair) = version_string(p...)
+version_string(a::Tuple{}, b::Tuple{}) = "*"
 
 function version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n}
-    m == n == 0 && return "*"
     lo, hi = join(a, "."), join(b, ".")
-    a == b ? (m ≥ 3 ? lo : "$lo.*") :
-    m == 0 ? "≤$hi" :
-    n == 0 ? "≥$lo" : "≥$lo ≤$hi"
+    if a == b
+        return lo
+    end
+    if m + 1 == n && a == b[1:m]
+        return b[end] == 0 ? hi : "$hi-"
+    end
+    if m == n + 1 && a[1:n] == b
+        return "$lo+"
+    end
+    if 0 == m < n
+        return all(iszero, b) ? hi : "≤$hi"
+    end
+    if m > n == 0
+        return "≥$lo"
+    end
+    return "$lo-$hi"
 end
 
 function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
@@ -208,8 +221,10 @@ dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)
 prune!(packages)
 
+#=
 for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
     print_package_metadata(pkg, p)
     print_versions_sha1(pkg, p)
     print_versions_julia(pkg, p)
 end
+=#

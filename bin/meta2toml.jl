@@ -119,29 +119,6 @@ end
                                         t[1] ≤ v.major && t[2] < v.minor ||
                                         t[1] ≤ v.major && t[2] ≤ v.minor && t[3] ≤ v.patch
 
-version_string(p::Pair) = version_string(p...)
-version_string(a::Tuple{}, b::Tuple{}) = "*"
-
-function version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n}
-    lo, hi = join(a, "."), join(b, ".")
-    if a == b
-        return lo
-    end
-    if m + 1 == n && a == b[1:m]
-        return b[end] == 0 ? hi : "$hi-"
-    end
-    if m == n + 1 && a[1:n] == b
-        return "$lo+"
-    end
-    if 0 == m < n
-        return all(iszero, b) ? hi : "≤$hi"
-    end
-    if m > n == 0
-        return "≥$lo"
-    end
-    return "$lo-$hi"
-end
-
 function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
     @assert issorted(inc) && issorted(exc)
     @assert isempty(inc ∩ exc)
@@ -181,6 +158,29 @@ function compress_version_map(fwd::Dict{VersionNumber,X}) where X
         end
     end
     return compressed
+end
+
+version_string(p::Pair) = version_string(p...)
+version_string(a::Tuple{}, b::Tuple{}) = "*"
+
+function version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n}
+    lo, hi = join(a, "."), join(b, ".")
+    if a == b
+        return lo
+    end
+    if m + 1 == n && a == b[1:m]
+        return b[end] == 0 ? hi : "$hi-"
+    end
+    if m == n + 1 && a[1:n] == b
+        return "$lo+"
+    end
+    if 0 == m < n
+        return all(iszero, b) ? hi : "≤$hi"
+    end
+    if m > n == 0
+        return "≥$lo"
+    end
+    return "$lo-$hi"
 end
 
 function print_package_metadata(pkg::String, p::Package)

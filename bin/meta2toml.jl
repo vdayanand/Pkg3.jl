@@ -89,7 +89,8 @@ function prune!(packages::Associative{String,Package})
         clean = true
         filter!(packages) do p, pkg
             filter!(pkg.versions) do v, ver
-                @clean thispatch(v) > v"0.0.0" &&
+                @clean v == thispatch(v) &&
+                thispatch(v) > v"0.0.0" &&
                 all(ver.requires) do kv
                     r, req = kv
                     haskey(packages, r) &&
@@ -103,14 +104,20 @@ function prune!(packages::Associative{String,Package})
 end
 
 ≲(v::VersionNumber, t::NTuple{0,Int}) = true
-≲(v::VersionNumber, t::NTuple{1,Int}) = v.major <= t[1]
-≲(v::VersionNumber, t::NTuple{2,Int}) = v.major <= t[1] && v.minor <= t[2]
-≲(v::VersionNumber, t::NTuple{3,Int}) = v.major <= t[1] && v.minor <= t[2] && v.patch <= t[3]
+≲(v::VersionNumber, t::NTuple{1,Int}) = v.major ≤ t[1]
+≲(v::VersionNumber, t::NTuple{2,Int}) = v.major < t[1] ||
+                                        v.major ≤ t[1] && v.minor ≤ t[2]
+≲(v::VersionNumber, t::NTuple{3,Int}) = v.major < t[1] ||
+                                        v.major ≤ t[1] && v.minor < t[2] ||
+                                        v.major ≤ t[1] && v.minor ≤ t[2] && v.patch ≤ t[3]
 
 ≲(t::NTuple{0,Int}, v::VersionNumber) = true
-≲(t::NTuple{1,Int}, v::VersionNumber) = t[1] <= v.major
-≲(t::NTuple{2,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor
-≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] <= v.major && t[2] <= v.minor && t[3] <= v.patch
+≲(t::NTuple{1,Int}, v::VersionNumber) = t[1] ≤ v.major
+≲(t::NTuple{2,Int}, v::VersionNumber) = t[1] < v.major ||
+                                        t[1] ≤ v.major && t[2] ≤ v.minor
+≲(t::NTuple{3,Int}, v::VersionNumber) = t[1] < v.major ||
+                                        t[1] ≤ v.major && t[2] < v.minor ||
+                                        t[1] ≤ v.major && t[2] ≤ v.minor && t[3] ≤ v.patch
 
 version_string(p::Pair) = version_string(p...)
 version_string(a::Tuple{}, b::Tuple{}) = "*"
@@ -140,8 +147,8 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
     @assert isempty(inc ∩ exc)
     tuples = Tuple[]
     for v in inc
-        lo = hi = (v.major,v.minor,v.patch)
-        for t in ((v.major,v.minor), (v.major,), ())
+        lo = hi = (v.major, v.minor, v.patch)
+        for t in ((v.major, v.minor), (v.major,), ())
             !any(t ≲ w ≤ v for w in exc) && (lo = t)
             !any(v ≤ w ≲ t for w in exc) && (hi = t)
         end
@@ -151,7 +158,10 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
             tuples[end] = hi # can be merged with last
         end
     end
-    [tuples[i] => tuples[i+1] for i = 1:2:length(tuples)]
+    pairs = [tuples[i] => tuples[i+1] for i = 1:2:length(tuples)]
+    @assert all(any(p[1] ≲ v ≲ p[2] for p ∈ pairs) for v ∈ inc)
+    @assert all(!any(p[1] ≲ v ≲ p[2] for p ∈ pairs) for v ∈ exc)
+    return pairs
 end
 
 function compress_version_map(fwd::Dict{VersionNumber,X}) where X
@@ -221,10 +231,10 @@ dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)
 prune!(packages)
 
-#=
-for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
-    print_package_metadata(pkg, p)
-    print_versions_sha1(pkg, p)
-    print_versions_julia(pkg, p)
+if !isinteractive()
+    for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
+        print_package_metadata(pkg, p)
+        print_versions_sha1(pkg, p)
+        print_versions_julia(pkg, p)
+    end
 end
-=#

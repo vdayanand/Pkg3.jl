@@ -122,20 +122,19 @@ end
 function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
     @assert issorted(inc) && issorted(exc)
     @assert isempty(inc ∩ exc)
-    tuples = Tuple[]
+    pairs = []
     for v in inc
         lo = hi = (v.major, v.minor, v.patch)
         for t in ((v.major, v.minor), (v.major,), ())
             !any(t ≲ w ≤ v for w in exc) && (lo = t)
             !any(v ≤ w ≲ t for w in exc) && (hi = t)
         end
-        if isempty(tuples) || any(tuples[end-1] ≲ w ≲ hi for w in exc)
-            push!(tuples, lo, hi) # need a new interval
+        if isempty(tuples) || any(pairs[end][1] ≲ w ≲ hi for w in exc)
+            push!(pairs, lo => hi) # need a new interval
         else
-            tuples[end] = hi # can be merged with last
+            pairs[end][2] = hi # can be merged with last
         end
     end
-    pairs = [tuples[i] => tuples[i+1] for i = 1:2:length(tuples)]
     @assert all(any(p[1] ≲ v ≲ p[2] for p ∈ pairs) for v ∈ inc)
     @assert all(!any(p[1] ≲ v ≲ p[2] for p ∈ pairs) for v ∈ exc)
     return pairs
@@ -161,27 +160,11 @@ function compress_version_map(fwd::Dict{VersionNumber,X}) where X
 end
 
 version_string(p::Pair) = version_string(p...)
-version_string(a::Tuple{}, b::Tuple{}) = "*"
 
 function version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n}
-    lo, hi = join(a, "."), join(b, ".")
-    if a == b
-        return lo
-    end
-    if m + 1 == n && a == b[1:m]
-        return b[end] == 0 ? hi : "$hi-"
-    end
-    if m == n + 1 && a[1:n] == b
-        return "$lo+"
-    end
-    if 0 == m < n
-        return all(iszero, b) ? hi : "≤$hi"
-    end
-    if m > n == 0
-        return "≥$lo"
-    end
-    return "$lo-$hi"
+    a == b ? join(a, '.') : "[$(join(a, '.')), $(join(b, '.'))]"
 end
+# version_string(a::Tuple{}, b::Tuple{}) = "*"
 
 function print_package_metadata(pkg::String, p::Package)
     print("""
@@ -198,7 +181,7 @@ function print_versions_sha1(pkg::String, p::Package)
     """)
     for (ver, v) in sort!(collect(p.versions), by=first)
         print("""
-            $ver = "$(v.sha1)"
+            "$ver" = "$(v.sha1)"
         """)
     end
     println()
@@ -219,9 +202,9 @@ function print_versions_julia(pkg::String, p::Package)
     d = Dict(ver => compress_julia_versions(v.julia) for (ver, v) in p.versions)
     for (tp, v) in sort!(collect(compress_version_map(d)), by=first∘first)
         lhs = version_string(tp)
-        rhs = "\"" * join(map(version_string, v), "\", \"") * "\""
+        rhs = join(map(version_string, v), "\", \"")
         print("""
-            "$lhs" = $rhs
+            "$lhs" = "$rhs"
         """)
     end
     println()

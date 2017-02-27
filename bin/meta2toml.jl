@@ -82,6 +82,8 @@ function load_packages(dir::String)
     return packages
 end
 
+const julia_versions = [VersionNumber(0,m) for m=1:5]
+
 macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 
 function prune!(packages::Associative{String,Package})
@@ -89,8 +91,8 @@ function prune!(packages::Associative{String,Package})
         clean = true
         filter!(packages) do p, pkg
             filter!(pkg.versions) do v, ver
-                @clean v == thispatch(v) &&
-                thispatch(v) > v"0.0.0" &&
+                @clean v == thispatch(v) > v"0.0.0" &&
+                any(julia in ver.julia for julia in julia_versions) &&
                 all(ver.requires) do kv
                     r, req = kv
                     haskey(packages, r) &&
@@ -196,8 +198,6 @@ function print_versions_sha1(pkg::String, p::Package)
     end
     println()
 end
-
-const julia_versions = [VersionNumber(0,m) for m=1:5]
 
 function compress_julia_versions(julia::VersionInterval)
     inc = filter(v->v in julia, julia_versions)

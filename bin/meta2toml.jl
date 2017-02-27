@@ -123,16 +123,27 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
     @assert issorted(inc) && issorted(exc)
     @assert isempty(inc ∩ exc)
     pairs = []
-    for v in inc
-        lo = hi = (v.major, v.minor, v.patch)
-        for t in ((v.major, v.minor), (v.major,), ())
-            !any(t ≲ w ≤ v for w in exc) && (lo = t)
-            !any(v ≤ w ≲ t for w in exc) && (hi = t)
+    if isempty(exc)
+        a, b = first(inc), last(inc)
+        lo = (a.major, a.minor, a.patch)
+        hi = (b.major, b.minor, b.patch)
+        i, m = 1, min(2, length(lo), length(hi))
+        for i = 1:m
+            lo[i] == hi[i] || break
         end
-        if isempty(tuples) || any(pairs[end][1] ≲ w ≲ hi for w in exc)
-            push!(pairs, lo => hi) # need a new interval
-        else
-            pairs[end][2] = hi # can be merged with last
+        push!(pairs, lo[1:i] => hi[1:i])
+    else
+        for v in inc
+            lo = hi = (v.major, v.minor, v.patch)
+            @assert !any(lo ≲ w ≲ hi for w in exc)
+            for t in ((v.major, v.minor),)
+                !any(t ≲ w ≲ t for w in exc) && (lo = hi = t)
+            end
+            if isempty(pairs) || any(pairs[end][1] ≲ w ≲ hi for w in exc)
+                push!(pairs, lo => hi) # need a new interval
+            else
+                pairs[end] = pairs[end][1] => hi # can be merged with last
+            end
         end
     end
     @assert all(any(p[1] ≲ v ≲ p[2] for p ∈ pairs) for v ∈ inc)
@@ -159,18 +170,17 @@ function compress_version_map(fwd::Dict{VersionNumber,X}) where X
     return compressed
 end
 
+version_string(a::Tuple{}, b::Tuple{}) = "*"
+version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} =
+    a == b ? join(a, '.') : "$(join(a, '.'))-$(join(b, '.'))"
 version_string(p::Pair) = version_string(p...)
-
-function version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n}
-    a == b ? join(a, '.') : "[$(join(a, '.')), $(join(b, '.'))]"
-end
-# version_string(a::Tuple{}, b::Tuple{}) = "*"
 
 function print_package_metadata(pkg::String, p::Package)
     print("""
     [$pkg]
     uuid = "$(p.uuid)"
     repository = "$(p.url)"
+    versions = [$(join(map(repr∘string, sort!(collect(keys(p.versions)))), ", "))]
 
     """)
 end
@@ -217,7 +227,7 @@ prune!(packages)
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
         print_package_metadata(pkg, p)
-        print_versions_sha1(pkg, p)
+        # print_versions_sha1(pkg, p)
         print_versions_julia(pkg, p)
     end
 end

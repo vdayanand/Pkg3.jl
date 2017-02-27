@@ -161,15 +161,7 @@ function compress_version_map(fwd::Dict{VersionNumber,X}) where X
         push!(versions, v)
     end
     sort!(versions)
-    compressed = Dict{Pair,X}()
-    for (x, inc) in rev
-        sort!(inc)
-        exc = setdiff(versions, inc)
-        for r in compress_versions(inc, exc)
-            compressed[r] = x
-        end
-    end
-    return compressed
+    Dict(x => compress_versions(sort!(inc), setdiff(versions, inc)) for (x, inc) in rev)
 end
 
 version_string(a::Tuple{}, b::Tuple{}) = "*"
@@ -182,7 +174,6 @@ function print_package_metadata(pkg::String, p::Package)
     [$pkg]
     uuid = "$(p.uuid)"
     repository = "$(p.url)"
-    versions = [$(join(map(repr∘string, sort!(collect(keys(p.versions)))), ", "))]
 
     """)
 end
@@ -202,20 +193,27 @@ end
 function compress_julia_versions(julia::VersionInterval)
     inc = filter(v->v in julia, julia_versions)
     exc = setdiff(julia_versions, inc)
-    compress_versions(inc, exc)
+    pairs = compress_versions(inc, exc)
+    @assert length(pairs) == 1
+    return first(pairs)
 end
 
 function print_versions_julia(pkg::String, p::Package)
     print("""
         [$pkg.versions.julia]
     """)
+    try
     d = Dict(ver => compress_julia_versions(v.julia) for (ver, v) in p.versions)
-    for (tp, v) in sort!(collect(compress_version_map(d)), by=first∘first)
-        lhs = version_string(tp)
-        rhs = join(map(version_string, v), "\", \"")
+    for (julias, pairs) in sort!(collect(compress_version_map(d)), by=first∘first∘last)
+        lhs = repr(version_string(julias))
+        rhs = length(pairs) <= 1 ? repr(version_string(pairs[1])) :
+            "[" * join(map(repr∘version_string, pairs), ", ") * "]"
         print("""
-            "$lhs" = "$rhs"
+            $lhs = $rhs
         """)
+    end
+    catch
+        warn(pkg)
     end
     println()
 end
@@ -227,7 +225,7 @@ prune!(packages)
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
         print_package_metadata(pkg, p)
-        # print_versions_sha1(pkg, p)
+        print_versions_sha1(pkg, p)
         print_versions_julia(pkg, p)
     end
 end

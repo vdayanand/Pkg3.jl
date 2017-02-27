@@ -220,10 +220,10 @@ function print_versions_julia(pkg::String, p::Package)
         isempty(vs) && continue
         julia_map[j] = sort!(vs)
     end
-    for (julias, versions) in sort!(collect(invert_map(invert_map(julia_map))), by=first∘first)
-        for julia_range in compress_versions(sort!(julias), julia_versions)
-            lhs = versions_repr(julia_range)
-            rhs = versions_repr(compress_versions(versions, all_versions))
+    for (left, right) in sort!(collect(invert_map(invert_map(julia_map))), by=first∘first)
+        for left_range in compress_versions(sort!(left), all_versions)
+            lhs = versions_repr(left_range)
+            rhs = versions_repr(compress_versions(right, julia_versions))
             print("""
                 $lhs = $rhs
             """)

@@ -89,17 +89,17 @@ macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 function prune!(packages::Associative{String,Package})
     while true
         clean = true
-        filter!(packages) do p, pkg
-            filter!(pkg.versions) do v, ver
-                @clean v == thispatch(v) > v"0.0.0" &&
-                any(julia in ver.julia for julia in julia_versions) &&
-                all(ver.requires) do kv
-                    r, req = kv
-                    haskey(packages, r) &&
-                    any(w->w in req.versions, keys(packages[r].versions))
+        filter!(packages) do pkg, p
+            filter!(p.versions) do ver, v
+                @clean ver == thispatch(ver) > v"0.0.0" &&
+                any(julia in v.julia for julia in julia_versions) &&
+                all(v.requires) do kv
+                    req, r = kv
+                    haskey(packages, req) &&
+                    any(w->w in r.versions, keys(packages[req].versions))
                 end
             end
-            @clean !isempty(pkg.versions)
+            @clean !isempty(p.versions)
         end
         clean && return packages
     end
@@ -126,25 +126,18 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
     @assert isempty(inc ∩ exc)
     pairs = []
     if isempty(exc)
-        a, b = first(inc), last(inc)
-        lo = (a.major, a.minor, a.patch)
-        hi = (b.major, b.minor, b.patch)
-        i, m = 1, min(2, length(lo), length(hi))
-        for i = 1:m
-            lo[i] == hi[i] || break
-        end
-        push!(pairs, lo[1:i] => hi[1:i])
+        lo, hi = first(inc), last(inc)
+        push!(pairs, (lo.major, lo.minor) => (hi.major, hi.minor))
     else
         for v in inc
-            lo = hi = (v.major, v.minor, v.patch)
-            @assert !any(lo ≲ w ≲ hi for w in exc)
-            for t in ((v.major, v.minor),)
-                !any(t ≲ w ≲ t for w in exc) && (lo = hi = t)
+            t = (v.major, v.minor)
+            if any(t ≲ w ≲ t for w in exc)
+                t = (v.major, v.minor, v.patch)
             end
-            if isempty(pairs) || any(pairs[end][1] ≲ w ≲ hi for w in exc)
-                push!(pairs, lo => hi) # need a new interval
+            if isempty(pairs) || any(pairs[end][1] ≲ w ≲ t for w in exc)
+                push!(pairs, t => t) # need a new interval
             else
-                pairs[end] = pairs[end][1] => hi # can be merged with last
+                pairs[end] = pairs[end][1] => t # can be merged with last
             end
         end
     end
@@ -164,10 +157,10 @@ function compress_version_map(fwd::Dict{VersionNumber,X}) where X
     Dict(x => compress_versions(sort!(inc), setdiff(versions, inc)) for (x, inc) in rev)
 end
 
+version_string(p::Pair) = version_string(p...)
 version_string(a::Tuple{}, b::Tuple{}) = "*"
 version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} =
     a == b ? join(a, '.') : "$(join(a, '.'))-$(join(b, '.'))"
-version_string(p::Pair) = version_string(p...)
 
 function print_package_metadata(pkg::String, p::Package)
     print("""

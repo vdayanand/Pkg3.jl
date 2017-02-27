@@ -6,6 +6,24 @@ using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
 using SHA
 
+## General utility functions ##
+
+function invert_map(fwd::Dict{K,V}) where {K,V}
+    rev = Dict{V,Vector{K}}()
+    for (k, v) in fwd
+        push!(get!(rev, v, K[]), k)
+    end
+    return rev
+end
+
+function invert_map(fwd::Dict{Vector{K},V}) where {K,V}
+    rev = Dict{V,Vector{K}}()
+    for (k, v) in fwd
+        append!(get!(rev, v, K[]), k)
+    end
+    return rev
+end
+
 ## Computing UUID5 values from (namespace, key) pairs ##
 
 function uuid5(namespace::UUID, key::String)
@@ -105,6 +123,8 @@ function prune!(packages::Associative{String,Package})
     end
 end
 
+## Functions for representing package version info ##
+
 ≲(v::VersionNumber, t::NTuple{0,Int}) = true
 ≲(v::VersionNumber, t::NTuple{1,Int}) = v.major ≤ t[1]
 ≲(v::VersionNumber, t::NTuple{2,Int}) = v.major < t[1] ||
@@ -121,9 +141,9 @@ end
                                         t[1] ≤ v.major && t[2] < v.minor ||
                                         t[1] ≤ v.major && t[2] ≤ v.minor && t[3] ≤ v.patch
 
-function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber})
-    @assert issorted(inc) && issorted(exc)
-    @assert isempty(inc ∩ exc)
+function compress_versions(inc::Vector{VersionNumber}, from::Vector{VersionNumber})
+    @assert issorted(inc) && issorted(from)
+    exc = sort!(setdiff(from, inc))
     pairs = []
     if isempty(exc)
         lo, hi = first(inc), last(inc)
@@ -145,22 +165,19 @@ function compress_versions(inc::Vector{VersionNumber}, exc::Vector{VersionNumber
     @assert all(!any(p[1] ≲ v ≲ p[2] for p ∈ pairs) for v ∈ exc)
     return pairs
 end
+compress_versions(f::Function, from::Vector{VersionNumber}) =
+    compress_versions(filter(f, from), from)
 
-function compress_version_map(fwd::Dict{VersionNumber,X}) where X
-    rev = Dict{X,Vector{VersionNumber}}()
-    versions = VersionNumber[]
-    for (v, x) in fwd
-        push!(get!(rev, x, VersionNumber[]), v)
-        push!(versions, v)
-    end
-    sort!(versions)
-    Dict(x => compress_versions(sort!(inc), setdiff(versions, inc)) for (x, inc) in rev)
-end
-
-version_string(p::Pair) = version_string(p...)
-version_string(a::Tuple{}, b::Tuple{}) = "*"
-version_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} =
+versions_string(p::Pair) = versions_string(p...)
+versions_string(a::Tuple{}, b::Tuple{}) = "*"
+versions_string(a::NTuple{m,Int}, b::NTuple{n,Int}) where {m,n} =
     a == b ? join(a, '.') : "$(join(a, '.'))-$(join(b, '.'))"
+
+versions_repr(x) = repr(versions_string(x))
+versions_repr(v::Vector) = length(v) == 1 ? repr(versions_string(v[1])) :
+    "[" * join(map(repr∘versions_string, v), ", ") * "]"
+
+## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package)
     print("""
@@ -184,9 +201,7 @@ function print_versions_sha1(pkg::String, p::Package)
 end
 
 function compress_julia_versions(julia::VersionInterval)
-    inc = filter(v->v in julia, julia_versions)
-    exc = setdiff(julia_versions, inc)
-    pairs = compress_versions(inc, exc)
+    pairs = compress_versions(v->v in julia, julia_versions)
     @assert length(pairs) == 1
     return first(pairs)
 end
@@ -195,21 +210,29 @@ function print_versions_julia(pkg::String, p::Package)
     print("""
         [$pkg.versions.julia]
     """)
-    try
-    d = Dict(ver => compress_julia_versions(v.julia) for (ver, v) in p.versions)
-    for (julias, pairs) in sort!(collect(compress_version_map(d)), by=first∘first∘last)
-        lhs = repr(version_string(julias))
-        rhs = length(pairs) <= 1 ? repr(version_string(pairs[1])) :
-            "[" * join(map(repr∘version_string, pairs), ", ") * "]"
-        print("""
-            $lhs = $rhs
-        """)
+    all_versions = sort!(collect(keys(p.versions)))
+    julia_map = Dict{VersionNumber,Vector{VersionNumber}}()
+    for j in julia_versions
+        vs = VersionNumber[]
+        for (ver, v) in p.versions
+            j in v.julia && push!(vs, ver)
+        end
+        isempty(vs) && continue
+        julia_map[j] = sort!(vs)
     end
-    catch
-        warn(pkg)
+    for (julias, versions) in sort!(collect(invert_map(invert_map(julia_map))), by=first∘first)
+        for julia_range in compress_versions(sort!(julias), julia_versions)
+            lhs = versions_repr(julia_range)
+            rhs = versions_repr(compress_versions(versions, all_versions))
+            print("""
+                $lhs = $rhs
+            """)
+        end
     end
     println()
 end
+
+## Load package data and generate registry ##
 
 dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)

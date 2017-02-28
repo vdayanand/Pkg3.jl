@@ -189,7 +189,7 @@ versions_repr(v::Vector) = length(v) == 1 ? repr(versions_string(v[1])) :
 
 ## Package info output routines ##
 
-function print_package_metadata(pkg::String, p::Package)
+function print_package_metadata(packages::Dict{String,Package}, pkg::String, p::Package)
     print("""
     [$pkg]
     uuid = "$(p.uuid)"
@@ -198,7 +198,7 @@ function print_package_metadata(pkg::String, p::Package)
     """)
 end
 
-function print_versions_sha1(pkg::String, p::Package)
+function print_versions_sha1(packages::Dict{String,Package}, pkg::String, p::Package)
     print("""
         [$pkg.versions.sha1]
     """)
@@ -210,7 +210,7 @@ function print_versions_sha1(pkg::String, p::Package)
     println()
 end
 
-function print_compat_julia(pkg::String, p::Package)
+function print_compat_julia(packages::Dict{String,Package}, pkg::String, p::Package)
     print("""
         [$pkg.compat.julia]
     """)
@@ -225,6 +225,28 @@ function print_compat_julia(pkg::String, p::Package)
     println()
 end
 
+# NOTE: UUID mapping is optional. When a dependency is used by name with no
+# corresponding UUID mapping, then the current meaning of this name in the same
+# registry is assumed. If no UUID mappings are present, the section may be
+# skipped entirely. If a package has a dependency which is not registered in the
+# same registry, then it  must include a UUID mapping entry for that dependency.
+
+function print_compat_uuids(packages::Dict{String,Package}, pkg::String, p::Package)
+    print("""
+        [$pkg.compat.uuids]
+    """)
+    pkgs = Set{String}()
+    for (ver, v) in p.versions
+        union!(pkgs, keys(v.requires))
+    end
+    for pkg in sort!(collect(pkgs))
+        print("""
+            $pkg = "$(packages[pkg].uuid)"
+        """)
+    end
+    println()
+end
+
 ## Load package data and generate registry ##
 
 dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
@@ -233,8 +255,13 @@ prune!(packages)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
-        print_package_metadata(pkg, p)
-        print_versions_sha1(pkg, p)
-        print_compat_julia(pkg, p)
+        print_package_metadata(packages, pkg, p)
+        print_versions_sha1(packages, pkg, p)
+        print_compat_julia(packages, pkg, p)
+        # NOTE: because of optional UUID mapping, this section is totally
+        # unnecessary while translating metadata. We could however, represent
+        # the Stats => StatsBase rename correctly.
+        false && print_compat_uuids(packages, pkg, p)
+        
     end
 end

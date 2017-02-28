@@ -26,6 +26,9 @@ function invert_map(fwd::Dict{Vector{K},V}) where {K,V}
     return rev
 end
 
+flatten_keys(d::Dict{Vector{K},V}) where {K,V} =
+    Dict{K,V}(k => v for (ks, v) in d for k in ks)
+
 ## Computing UUID5 values from (namespace, key) pairs ##
 
 function uuid5(namespace::UUID, key::String)
@@ -102,7 +105,9 @@ function load_packages(dir::String)
     return packages
 end
 
-const julia_versions = [VersionNumber(0,m) for m=1:5]
+julia_versions(f::Function) = collect(Iterators.filter(f, VersionNumber(0,m) for m=1:5))
+julia_versions(vi::VersionInterval) = julia_versions(v->v in vi)
+@eval julia_versions() = $(julia_versions(v->true))
 
 macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 
@@ -112,7 +117,7 @@ function prune!(packages::Associative{String,Package})
         filter!(packages) do pkg, p
             filter!(p.versions) do ver, v
                 @clean ver == thispatch(ver) > v"0.0.0" &&
-                any(julia in v.julia for julia in julia_versions) &&
+                !isempty(julia_versions(v.julia)) &&
                 all(v.requires) do kv
                     req, r = kv
                     haskey(packages, req) &&
@@ -144,7 +149,7 @@ end
                                         t[1] ≤ v.major && t[2] ≤ v.minor && t[3] ≤ v.patch
 
 function compress_versions(inc::Vector{VersionNumber}, from::Vector{VersionNumber})
-    @assert issorted(inc) && issorted(from)
+    issorted(inc) || (inc = sort(inc))
     exc = sort!(setdiff(from, inc))
     pairs = []
     if isempty(exc)
@@ -169,6 +174,9 @@ function compress_versions(inc::Vector{VersionNumber}, from::Vector{VersionNumbe
 end
 compress_versions(f::Function, from::Vector{VersionNumber}) =
     compress_versions(filter(f, from), from)
+compress_versions(vi::VersionInterval, from::Vector{VersionNumber}) =
+    compress_versions(v->v in vi, from)
+compress_versions(inc, from) = compress_versions(inc, collect(from))
 
 versions_string(p::Pair) = versions_string(p...)
 versions_string(a::Tuple{}, b::Tuple{}) = "*"
@@ -202,34 +210,17 @@ function print_versions_sha1(pkg::String, p::Package)
     println()
 end
 
-function compress_julia_versions(julia::VersionInterval)
-    pairs = compress_versions(v->v in julia, julia_versions)
-    @assert length(pairs) == 1
-    return first(pairs)
-end
-
 function print_versions_julia(pkg::String, p::Package)
     print("""
         [$pkg.versions.julia]
     """)
-    all_versions = sort!(collect(keys(p.versions)))
-    julia_map = Dict{VersionNumber,Vector{VersionNumber}}()
-    for j in julia_versions
-        vs = VersionNumber[]
-        for (ver, v) in p.versions
-            j in v.julia && push!(vs, ver)
-        end
-        isempty(vs) && continue
-        julia_map[j] = sort!(vs)
-    end
-    for (left, right) in sort!(collect(invert_map(julia_map)), by=first∘first)
-        for left_range in compress_versions(left, all_versions)
-            lhs = versions_repr(left_range)
-            rhs = versions_repr(compress_versions(right, julia_versions))
-            print("""
-                $lhs = $rhs
-            """)
-        end
+    fwd = Dict(ver => compress_versions(v.julia, julia_versions()) for (ver, v) in p.versions)
+    rev = Dict(jul => compress_versions(vers, keys(fwd)) for (jul, vers) in invert_map(fwd))
+    for (vers, jul) in sort!(collect(flatten_keys(invert_map(rev))), by=first∘first)
+        @assert length(jul) == 1
+        print("""
+            $(versions_repr(vers)) = $(versions_repr(jul))
+        """)
     end
     println()
 end

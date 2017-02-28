@@ -187,9 +187,17 @@ versions_repr(x) = repr(versions_string(x))
 versions_repr(v::Vector) = length(v) == 1 ? repr(versions_string(v[1])) :
     "[" * join(map(repr∘versions_string, v), ", ") * "]"
 
+## Preprocessing routines ##
+
+function compat_julia(p::Package)
+    fwd = Dict(ver => compress_versions(v.julia, julia_versions()) for (ver, v) in p.versions)
+    rev = Dict(jul => compress_versions(vers, keys(fwd)) for (jul, vers) in invert_map(fwd))
+    return sort!(collect(flatten_keys(invert_map(rev))), by=first∘first)
+end
+
 ## Package info output routines ##
 
-function print_package_metadata(packages::Dict{String,Package}, pkg::String, p::Package)
+function print_package_metadata(pkg::String, p::Package; packages=Main.packages)
     print("""
     [$pkg]
     uuid = "$(p.uuid)"
@@ -198,7 +206,7 @@ function print_package_metadata(packages::Dict{String,Package}, pkg::String, p::
     """)
 end
 
-function print_versions_sha1(packages::Dict{String,Package}, pkg::String, p::Package)
+function print_versions_sha1(pkg::String, p::Package; packages=Main.packages)
     print("""
         [$pkg.versions.sha1]
     """)
@@ -210,16 +218,14 @@ function print_versions_sha1(packages::Dict{String,Package}, pkg::String, p::Pac
     println()
 end
 
-function print_compat_julia(packages::Dict{String,Package}, pkg::String, p::Package)
+function print_compat_julia(pkg::String, p::Package; packages=Main.packages, compat=compat_julia(p))
     print("""
         [$pkg.compat.julia]
     """)
-    fwd = Dict(ver => compress_versions(v.julia, julia_versions()) for (ver, v) in p.versions)
-    rev = Dict(jul => compress_versions(vers, keys(fwd)) for (jul, vers) in invert_map(fwd))
-    for (vers, jul) in sort!(collect(flatten_keys(invert_map(rev))), by=first∘first)
-        @assert length(jul) == 1
+    for (versions, julia) in compat
+        @assert length(julia) == 1
         print("""
-            $(versions_repr(vers)) = $(versions_repr(jul))
+            $(versions_repr(versions)) = $(versions_repr(julia))
         """)
     end
     println()
@@ -236,7 +242,7 @@ end
 # expressed by associating the name with a `version => uuid` table instead of
 # just a single UUID value.
 
-function print_compat_uuids(packages::Dict{String,Package}, pkg::String, p::Package)
+function print_compat_uuids(pkg::String, p::Package; packages=Main.packages)
     print("""
         [$pkg.compat.uuids]
     """)
@@ -252,7 +258,7 @@ function print_compat_uuids(packages::Dict{String,Package}, pkg::String, p::Pack
     println()
 end
 
-function print_compat_versions(packages::Dict{String,Package}, pkg::String, p::Package)
+function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
     fwd = Dict{String,Dict{VersionNumber,Any}}()
     for (ver, v) in p.versions, (req, r) in v.requires
         d = get!(fwd, req, Dict{VersionNumber,Any}())
@@ -300,13 +306,13 @@ prune!(packages)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
-        print_package_metadata(packages, pkg, p)
-        print_versions_sha1(packages, pkg, p)
-        print_compat_julia(packages, pkg, p)
+        print_package_metadata(pkg, p)
+        print_versions_sha1(pkg, p)
+        print_compat_julia(pkg, p)
         # NOTE: because of optional UUID mapping, this section is totally
         # unnecessary while translating metadata. We could however, represent
         # the Stats => StatsBase rename correctly.
-        false && print_compat_uuids(packages, pkg, p)
-        print_compat_versions(packages, pkg, p)
+        false && print_compat_uuids(pkg, p)
+        print_compat_versions(pkg, p)
     end
 end

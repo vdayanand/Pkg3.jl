@@ -244,7 +244,7 @@ function print_compat_uuids(packages::Dict{String,Package}, pkg::String, p::Pack
     for (ver, v) in p.versions
         union!(pkgs, keys(v.requires))
     end
-    for pkg in sort!(collect(pkgs))
+    for pkg in sort!(collect(pkgs), by=lowercase)
         print("""
             $pkg = "$(packages[pkg].uuid)"
         """)
@@ -258,10 +258,10 @@ function print_compat_versions(packages::Dict{String,Package}, pkg::String, p::P
         d = get!(fwd, req, Dict{VersionNumber,Any}())
         d[ver] = compress_versions(r.versions, keys(packages[req].versions))
     end
-    rev = Dict{String,Dict{Vector{Any},Vector{Any}}}()
+    rev = Dict{String,Dict{Any,Vector{Any}}}()
     vers = sort!(collect(keys(p.versions)))
     oneliners = false
-    for (req, d) in sort!(collect(fwd), by=first)
+    for (req, d) in sort!(collect(fwd), by=lowercase∘first)
         r = Dict(rv => compress_versions(pv, vers) for (rv, pv) in invert_map(d))
         if length(r) == 1 && length(d) == length(vers)
             # we have a one-line compat entry: same for all versions
@@ -274,10 +274,22 @@ function print_compat_versions(packages::Dict{String,Package}, pkg::String, p::P
             print("""
                 $req = $(versions_repr(first(r)[1]))
             """)
+        else
+            rev[req] = flatten_keys(invert_map(r))
         end
     end
     oneliners && println()
-    # TODO: print requirements that need their own blocks
+    for (req, r) in sort!(collect(rev), by=lowercase∘first)
+        print("""
+                [$pkg.compat.versions.$req]
+        """)
+        for (pv, rv) in sort!(collect(r), by=first∘first)
+            print("""
+                    $(versions_repr(pv)) = $(versions_repr(rv))
+            """)
+        end
+        println()
+    end
 end
 
 ## Load package data and generate registry ##

@@ -210,9 +210,9 @@ function print_versions_sha1(pkg::String, p::Package)
     println()
 end
 
-function print_versions_julia(pkg::String, p::Package)
+function print_compat_julia(pkg::String, p::Package)
     print("""
-        [$pkg.versions.julia]
+        [$pkg.compat.julia]
     """)
     fwd = Dict(ver => compress_versions(v.julia, julia_versions()) for (ver, v) in p.versions)
     rev = Dict(jul => compress_versions(vers, keys(fwd)) for (jul, vers) in invert_map(fwd))
@@ -235,6 +235,6 @@ if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
         print_package_metadata(pkg, p)
         print_versions_sha1(pkg, p)
-        print_versions_julia(pkg, p)
+        print_compat_julia(pkg, p)
     end
 end

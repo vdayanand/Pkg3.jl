@@ -231,6 +231,11 @@ end
 # skipped entirely. If a package has a dependency which is not registered in the
 # same registry, then it  must include a UUID mapping entry for that dependency.
 
+# This code doesn't emit this, but if a dependency name is used to refer to
+# different packages across different versions of a package, then this is
+# expressed by associating the name with a `version => uuid` table instead of
+# just a single UUID value.
+
 function print_compat_uuids(packages::Dict{String,Package}, pkg::String, p::Package)
     print("""
         [$pkg.compat.uuids]
@@ -245,6 +250,34 @@ function print_compat_uuids(packages::Dict{String,Package}, pkg::String, p::Pack
         """)
     end
     println()
+end
+
+function print_compat_versions(packages::Dict{String,Package}, pkg::String, p::Package)
+    fwd = Dict{String,Dict{VersionNumber,Any}}()
+    for (ver, v) in p.versions, (req, r) in v.requires
+        d = get!(fwd, req, Dict{VersionNumber,Any}())
+        d[ver] = compress_versions(r.versions, keys(packages[req].versions))
+    end
+    rev = Dict{String,Dict{Vector{Any},Vector{Any}}}()
+    vers = sort!(collect(keys(p.versions)))
+    oneliners = false
+    for (req, d) in sort!(collect(fwd), by=first)
+        r = Dict(rv => compress_versions(pv, vers) for (rv, pv) in invert_map(d))
+        if length(r) == 1 && length(d) == length(vers)
+            # we have a one-line compat entry: same for all versions
+            if !oneliners
+                print("""
+                    [$pkg.compat.versions]
+                """)
+                oneliners = true
+            end
+            print("""
+                $req = $(versions_repr(first(r)[1]))
+            """)
+        end
+    end
+    oneliners && println()
+    # TODO: print requirements that need their own blocks
 end
 
 ## Load package data and generate registry ##
@@ -262,6 +295,6 @@ if !isinteractive()
         # unnecessary while translating metadata. We could however, represent
         # the Stats => StatsBase rename correctly.
         false && print_compat_uuids(packages, pkg, p)
-        
+        print_compat_versions(packages, pkg, p)
     end
 end

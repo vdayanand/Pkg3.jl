@@ -13,6 +13,7 @@ function invert_map(fwd::Dict{K,V}) where {K,V}
     for (k, v) in fwd
         push!(get!(rev, v, K[]), k)
     end
+    foreach(sort!, values(rev))
     return rev
 end
 
@@ -21,6 +22,7 @@ function invert_map(fwd::Dict{Vector{K},V}) where {K,V}
     for (k, v) in fwd
         append!(get!(rev, v, K[]), k)
     end
+    foreach(sort!, values(rev))
     return rev
 end
 
@@ -220,8 +222,8 @@ function print_versions_julia(pkg::String, p::Package)
         isempty(vs) && continue
         julia_map[j] = sort!(vs)
     end
-    for (left, right) in sort!(collect(invert_map(invert_map(julia_map))), by=first∘first)
-        for left_range in compress_versions(sort!(left), all_versions)
+    for (left, right) in sort!(collect(invert_map(julia_map)), by=first∘first)
+        for left_range in compress_versions(left, all_versions)
             lhs = versions_repr(left_range)
             rhs = versions_repr(compress_versions(right, julia_versions))
             print("""

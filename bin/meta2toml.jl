@@ -197,13 +197,18 @@ end
 
 ## Package info output routines ##
 
-function print_package_metadata(pkg::String, p::Package; packages=Main.packages)
+function print_package_metadata(pkg::String, p::Package; packages=Main.packages, julia=compat_julia(p))
     print("""
     [$pkg]
     uuid = "$(p.uuid)"
     repository = "$(p.url)"
-
     """)
+    if length(julia) == 1
+        print("""
+        julia = $(versions_repr(julia[1][2]))
+        """)
+    end
+    println()
 end
 
 function print_versions_sha1(pkg::String, p::Package; packages=Main.packages)
@@ -218,14 +223,15 @@ function print_versions_sha1(pkg::String, p::Package; packages=Main.packages)
     println()
 end
 
-function print_compat_julia(pkg::String, p::Package; packages=Main.packages, compat=compat_julia(p))
+function print_compat_julia(pkg::String, p::Package; packages=Main.packages, julia=compat_julia(p))
+    length(julia) == 1 && return
     print("""
-        [$pkg.compat.julia]
+        [$pkg.julia]
     """)
-    for (versions, julia) in compat
-        @assert length(julia) == 1
+    for (versions, julias) in julia
+        @assert length(julias) == 1
         print("""
-            $(versions_repr(versions)) = $(versions_repr(julia))
+            $(versions_repr(versions)) = $(versions_repr(julias))
         """)
     end
     println()
@@ -306,9 +312,10 @@ prune!(packages)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
-        print_package_metadata(pkg, p)
+        julia = compat_julia(p)
+        print_package_metadata(pkg, p, julia=julia)
         print_versions_sha1(pkg, p)
-        print_compat_julia(pkg, p)
+        print_compat_julia(pkg, p, julia=julia)
         # NOTE: because of optional UUID mapping, this section is totally
         # unnecessary while translating metadata. We could however, represent
         # the Stats => StatsBase rename correctly.

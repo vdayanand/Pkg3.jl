@@ -197,11 +197,11 @@ end
 
 ## Package info output routines ##
 
-function print_package_metadata(pkg::String, p::Package; packages=Main.packages, julia=compat_julia(p))
+function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))
     print("""
     [$pkg]
     uuid = "$(p.uuid)"
-    repository = "$(p.url)"
+    repo = "$(p.url)"
     """)
     if length(julia) == 1
         print("""
@@ -211,27 +211,27 @@ function print_package_metadata(pkg::String, p::Package; packages=Main.packages,
     println()
 end
 
-function print_versions_sha1(pkg::String, p::Package; packages=Main.packages)
+function print_versions_sha1(pkg::String, p::Package)
     print("""
-        [$pkg.versions.sha1]
+    \t[$pkg.versions.sha1]
     """)
     for (ver, v) in sort!(collect(p.versions), by=first)
         print("""
-            "$ver" = "$(v.sha1)"
+        \t"$ver" = "$(v.sha1)"
         """)
     end
     println()
 end
 
-function print_compat_julia(pkg::String, p::Package; packages=Main.packages, julia=compat_julia(p))
+function print_compat_julia(pkg::String, p::Package; julia=compat_julia(p))
     length(julia) == 1 && return
     print("""
-        [$pkg.julia]
+    \t[$pkg.julia]
     """)
     for (versions, julias) in julia
         @assert length(julias) == 1
         print("""
-            $(versions_repr(versions)) = $(versions_repr(julias))
+        \t$(versions_repr(versions)) = $(versions_repr(julias))
         """)
     end
     println()
@@ -250,7 +250,7 @@ end
 
 function print_compat_uuids(pkg::String, p::Package; packages=Main.packages)
     print("""
-        [$pkg.compat.uuids]
+    \t[$pkg.compat.uuids]
     """)
     pkgs = Set{String}()
     for (ver, v) in p.versions
@@ -258,7 +258,7 @@ function print_compat_uuids(pkg::String, p::Package; packages=Main.packages)
     end
     for pkg in sort!(collect(pkgs), by=lowercase)
         print("""
-            $pkg = "$(packages[pkg].uuid)"
+        \t$pkg = "$(packages[pkg].uuid)"
         """)
     end
     println()
@@ -279,12 +279,12 @@ function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
             # we have a one-line compat entry: same for all versions
             if !oneliners
                 print("""
-                    [$pkg.compat.versions]
+                \t[$pkg.compat.versions]
                 """)
                 oneliners = true
             end
             print("""
-                $req = $(versions_repr(first(r)[1]))
+            \t$req = $(versions_repr(first(r)[1]))
             """)
         else
             rev[req] = flatten_keys(invert_map(r))
@@ -293,11 +293,11 @@ function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
     oneliners && println()
     for (req, r) in sort!(collect(rev), by=lowercase∘first)
         print("""
-                [$pkg.compat.versions.$req]
+        \t\t[$pkg.compat.versions.$req]
         """)
         for (pv, rv) in sort!(collect(r), by=first∘first)
             print("""
-                    $(versions_repr(pv)) = $(versions_repr(rv))
+            \t\t$(versions_repr(pv)) = $(versions_repr(rv))
             """)
         end
         println()

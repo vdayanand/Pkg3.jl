@@ -105,9 +105,9 @@ function load_packages(dir::String)
     return packages
 end
 
-julia_versions(f::Function) = collect(Iterators.filter(f, VersionNumber(0,m) for m=1:5))
+@eval julia_versions() = $([VersionNumber(0,m) for m=1:5])
+julia_versions(f::Function) = filter(f, julia_versions())
 julia_versions(vi::VersionInterval) = julia_versions(v->v in vi)
-@eval julia_versions() = $(julia_versions(v->true))
 
 macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 
@@ -293,11 +293,11 @@ function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
     oneliners && println()
     for (req, r) in sort!(collect(rev), by=lowercase∘first)
         print("""
-        \t\t[$pkg.compat.versions.$req]
+        \t[$pkg.compat.versions.$req]
         """)
         for (pv, rv) in sort!(collect(r), by=first∘first)
             print("""
-            \t\t$(versions_repr(pv)) = $(versions_repr(rv))
+            \t$(versions_repr(pv)) = $(versions_repr(rv))
             """)
         end
         println()

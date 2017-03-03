@@ -195,6 +195,28 @@ function compat_julia(p::Package)
     return sort!(collect(flatten_keys(invert_map(rev))), by=first∘first)
 end
 
+function compat_versions(p::Package, packages=Main.packages)
+    fwd = Dict{String,Dict{VersionNumber,Any}}()
+    for (ver, v) in p.versions, (req, r) in v.requires
+        d = get!(fwd, req, Dict{VersionNumber,Any}())
+        d[ver] = compress_versions(r.versions, keys(packages[req].versions))
+    end
+    vers = sort!(collect(keys(p.versions)))
+    uniform = Dict{String,Vector{Any}}()
+    nonunif = Dict{String,Dict{Any,Vector{Any}}}()
+    for (req, d) in sort!(collect(fwd), by=lowercase∘first)
+        r = Dict(rv => compress_versions(pv, vers) for (rv, pv) in invert_map(d))
+        if length(r) == 1 && length(d) == length(vers)
+            # same requirements for all pkg versions
+            uniform[req] = first(keys(r))
+        else
+            # different requirements for various versions
+            nonunif[req] = flatten_keys(invert_map(r))
+        end
+    end
+    return uniform, nonunif
+end
+
 ## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))
@@ -265,33 +287,19 @@ function print_compat_uuids(pkg::String, p::Package; packages=Main.packages)
 end
 
 function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
-    fwd = Dict{String,Dict{VersionNumber,Any}}()
-    for (ver, v) in p.versions, (req, r) in v.requires
-        d = get!(fwd, req, Dict{VersionNumber,Any}())
-        d[ver] = compress_versions(r.versions, keys(packages[req].versions))
-    end
-    rev = Dict{String,Dict{Any,Vector{Any}}}()
-    vers = sort!(collect(keys(p.versions)))
-    oneliners = false
-    for (req, d) in sort!(collect(fwd), by=lowercase∘first)
-        r = Dict(rv => compress_versions(pv, vers) for (rv, pv) in invert_map(d))
-        if length(r) == 1 && length(d) == length(vers)
-            # we have a one-line compat entry: same for all versions
-            if !oneliners
-                print("""
-                \t[$pkg.compat.versions]
-                """)
-                oneliners = true
-            end
+    uniform, nonunif = compat_versions(p, packages)
+    if !isempty(uniform)
+        print("""
+        \t[$pkg.compat.versions]
+        """)
+        for (req, v) in sort!(collect(uniform), by=lowercase∘first)
             print("""
-            \t$req = $(versions_repr(first(r)[1]))
+            \t$req = $(versions_repr(v))
             """)
-        else
-            rev[req] = flatten_keys(invert_map(r))
         end
+        println()
     end
-    oneliners && println()
-    for (req, r) in sort!(collect(rev), by=lowercase∘first)
+    for (req, r) in sort!(collect(nonunif), by=lowercase∘first)
         print("""
         \t[$pkg.compat.versions.$req]
         """)

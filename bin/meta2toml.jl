@@ -203,7 +203,7 @@ function compat_versions(p::Package, packages=Main.packages)
     end
     vers = sort!(collect(keys(p.versions)))
     uniform = Dict{String,Vector{Any}}()
-    nonunif = Dict{String,Dict{Any,Vector{Any}}}()
+    nonunif = Dict{String,Vector{Pair}}()
     for (req, d) in sort!(collect(fwd), by=lowercase∘first)
         r = Dict(rv => compress_versions(pv, vers) for (rv, pv) in invert_map(d))
         if length(r) == 1 && length(d) == length(vers)
@@ -211,10 +211,11 @@ function compat_versions(p::Package, packages=Main.packages)
             uniform[req] = first(keys(r))
         else
             # different requirements for various versions
-            nonunif[req] = flatten_keys(invert_map(r))
+            nonunif[req] = sort!(collect(flatten_keys(invert_map(r))), by=first∘first)
         end
     end
-    return uniform, nonunif
+    (sort!(collect(uniform), by=lowercase∘first),
+     sort!(collect(nonunif), by=lowercase∘first))
 end
 
 ## Package info output routines ##
@@ -292,14 +293,14 @@ function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
         print("""
         \t[$pkg.compat.versions]
         """)
-        for (req, v) in sort!(collect(uniform), by=lowercase∘first)
+        for (req, v) in uniform
             print("""
             \t$req = $(versions_repr(v))
             """)
         end
         println()
     end
-    for (req, r) in sort!(collect(nonunif), by=lowercase∘first)
+    for (req, r) in nonunif
         print("""
         \t[$pkg.compat.versions.$req]
         """)

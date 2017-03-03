@@ -313,6 +313,36 @@ function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
     end
 end
 
+function print_compat(pkg::String, p::Package; packages=Main.packages)
+    julia = compat_julia(p)
+    uniform, nonunif = compat_versions(p, packages)
+
+    if length(julia) == 1 || !isempty(uniform)
+        println("[$pkg]")
+        if length(julia) == 1
+            println("julia = $(versions_repr(julia[1][2]))")
+        end
+        for (req, v) in uniform
+            println("$req = $(versions_repr(v))")
+        end
+        println()
+    end
+    if length(julia) != 1
+        println("[$pkg.julia]")
+        for (versions, julias) in julia
+            println("$(versions_repr(versions)) = $(versions_repr(julias))")
+        end
+        println()
+    end
+    for (req, r) in nonunif
+        println("[$pkg.$req]")
+        for (pv, rv) in r
+            println("$(versions_repr(pv)) = $(versions_repr(rv))")
+        end
+        println()
+    end
+end
+
 ## Load package data and generate registry ##
 
 dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
@@ -321,14 +351,6 @@ prune!(packages)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
-        julia = compat_julia(p)
-        print_package_metadata(pkg, p, julia=julia)
-        print_versions_sha1(pkg, p)
-        print_compat_julia(pkg, p, julia=julia)
-        # NOTE: because of optional UUID mapping, this section is totally
-        # unnecessary while translating metadata. We could however, represent
-        # the Stats => StatsBase rename correctly.
-        false && print_compat_uuids(pkg, p)
-        print_compat_versions(pkg, p)
+        print_compat(pkg, p)
     end
 end

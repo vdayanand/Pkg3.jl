@@ -351,6 +351,14 @@ prune!(packages)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
-        print_compat(pkg, p)
+        julia = compat_julia(p)
+        print_package_metadata(pkg, p, julia=julia)
+        print_versions_sha1(pkg, p)
+        print_compat_julia(pkg, p, julia=julia)
+        # NOTE: because of optional UUID mapping, this section is totally
+        # unnecessary while translating metadata. We could however, represent
+        # the Stats => StatsBase rename correctly.
+        false && print_compat_uuids(pkg, p)
+        print_compat_versions(pkg, p)
     end
 end

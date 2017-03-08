@@ -218,6 +218,41 @@ function compat_versions(p::Package, packages=Main.packages)
      sort!(collect(nonunif), by=lowercase∘first))
 end
 
+## Some computational utility functions ##
+
+function representative_versions(pkg::String; packages=Main.packages)
+    p = packages[pkg]
+    versions = sort!(collect(keys(p.versions)))
+    rep = pop!(versions)
+    reps = [rep]
+    while !isempty(versions)
+        rep′ = pop!(versions)
+        for (pkg′, p′) in packages, (ver, v) in p′.versions
+            haskey(v.requires, pkg) || continue
+            vers = v.requires[pkg].versions
+            if (rep in vers) ⊻ (rep′ in vers)
+                push!(reps, rep′)
+                rep = rep′
+                break
+            end
+        end
+    end
+    return reverse!(reps)
+end
+
+function incompatibility_matrix(packages=Main.packages, versions=Main.versions)
+    n = length(versions)
+    X = spzeros(Int, n, n)
+    for (i, (p1, v1)) in enumerate(versions),
+        (j, (p2, v2)) in enumerate(versions)
+        r = packages[p1].versions[v1].requires
+        if p1 == p2 && v1 != v2 || haskey(r, p2) && v2 ∉ r[p2].versions
+            X[i,j] = X[j,i] = 1
+        end
+    end
+    return X
+end
+
 ## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))
@@ -346,8 +381,13 @@ end
 ## Load package data and generate registry ##
 
 dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
+
 packages = load_packages(dir)
 prune!(packages)
+
+versions = [(pkg, ver) for (pkg, p) in packages for ver in representative_versions(pkg)]
+sort!(versions, by=last)
+sort!(versions, by=lowercase∘first)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)

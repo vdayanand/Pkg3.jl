@@ -246,11 +246,25 @@ function incompatibility_matrix(packages=Main.packages, versions=Main.versions)
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = packages[p1].versions[v1].requires
-        if p1 == p2 && v1 != v2 || haskey(r, p2) && v2 ∉ r[p2].versions
+        if haskey(r, p2) && v2 ∉ r[p2].versions
             X[i,j] = X[j,i] = 1
         end
     end
     return X
+end
+
+function version_equivalence(X)
+    E = Vector{Vector{Int}}(size(X,2))
+    for j = 1:size(X,2)
+        isassigned(E, j) && continue
+        v = [j]
+        for k = j+1:size(X,2)
+            X[:,j] != X[:,k] && continue
+            E[k] = push!(v, k)
+        end
+        E[j] = v
+    end
+    return unique(E)
 end
 
 ## Package info output routines ##
@@ -385,7 +399,7 @@ dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 packages = load_packages(dir)
 prune!(packages)
 
-versions = [(pkg, ver) for (pkg, p) in packages for ver in representative_versions(pkg)]
+versions = [(pkg, ver) for (pkg, p) in packages for (ver, v) in p.versions]
 sort!(versions, by=last)
 sort!(versions, by=lowercase∘first)
 

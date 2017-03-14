@@ -277,16 +277,39 @@ function representative_versions(pkg::String; packages=Main.packages)
 end
 
 function incompatibility_matrix(packages=Main.packages, versions=Main.versions)
-    n = length(versions)
-    X = spzeros(Int, n, n)
+    X = spzeros(length(versions), length(versions))
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = packages[p1].versions[v1].requires
-        if haskey(r, p2) && v2 ∉ r[p2].versions
+        if p1 == p2 && v1 != v2 || haskey(r, p2) && v2 ∉ r[p2].versions
             X[i,j] = X[j,i] = 1
         end
     end
     return X
+end
+
+function package_matrix(versions=Main.versions)
+    packages = unique(first.(versions))
+    P = spzeros(length(packages), length(versions))
+    for (i, p1) in enumerate(packages),
+        (j, (p2, _)) in enumerate(versions)
+        if p1 == p2
+            P[i,j] = 1
+        end
+    end
+    return P
+end
+
+function dependency_matrix(packages=Main.packages, versions=Main.versions)
+    I = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
+    D = spzeros(length(I), length(versions))
+    for (j, (pkg, ver)) in enumerate(versions)
+        r = packages[pkg].versions[ver].requires
+        for dep in keys(r)
+            D[I[dep],j] = 1
+        end
+    end
+    return D
 end
 
 function version_equivalence(X)

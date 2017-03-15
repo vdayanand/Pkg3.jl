@@ -300,7 +300,7 @@ function package_matrix(versions=Main.versions)
     return P
 end
 
-function dependency_matrix(packages=Main.packages, versions=Main.versions)
+function requires_matrix(packages=Main.packages, versions=Main.versions)
     I = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
     D = spzeros(length(I), length(versions))
     for (j, (pkg, ver)) in enumerate(versions)
@@ -310,6 +310,18 @@ function dependency_matrix(packages=Main.packages, versions=Main.versions)
         end
     end
     return D
+end
+
+function iterate_dependencies(X, P, R)
+    X += I
+    D = max.(0, min.(1, P'R) - X)
+    println("Density 0: $(nnz(D)/length(D))")
+    for i = 1:typemax(Int)
+        D′ = max.(0, min.(1, D + D^2) - X)
+        println("Density $i: $(nnz(D′)/length(D′))")
+        D′ == D && return D
+        D = D′
+    end
 end
 
 function version_equivalence(X)

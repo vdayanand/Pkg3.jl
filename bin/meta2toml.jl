@@ -312,16 +312,24 @@ function requires_matrix(packages=Main.packages, versions=Main.versions)
     return D
 end
 
+density(X) = nnz(X)/prod(size(X))
+
 function iterate_dependencies(X, P, R)
     X += I
     D = max.(0, min.(1, P'R) - X)
-    println("Density 0: $(nnz(D)/length(D))")
+    println("Density 0: $(density(D))")
     for i = 1:typemax(Int)
         D′ = max.(0, min.(1, D + D^2) - X)
-        println("Density $i: $(nnz(D′)/length(D′))")
-        D′ == D && return D
+        println("Density $i: $(density(D′))")
+        D′ == D && break
         D = D′
     end
+    return D
+end
+
+function disjoint_versions(D, versions=Main.versions)
+    F = full(D)
+    max.(0, convert(SparseMatrixCSC{Float64,Int}, F'F .== 0) - X)
 end
 
 function version_equivalence(X)
@@ -336,6 +344,14 @@ function version_equivalence(X)
         E[j] = v
     end
     return unique(E)
+end
+
+if false
+    X = incompatibility_matrix()
+    P = package_matrix()
+    R = requires_matrix()
+    D = iterate_dependencies(X, P, R)
+    T = disjoint_versions(D)
 end
 
 ## Package info output routines ##

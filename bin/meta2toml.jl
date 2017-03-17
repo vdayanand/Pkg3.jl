@@ -277,7 +277,7 @@ function representative_versions(pkg::String; packages=Main.packages)
 end
 
 function incompatibility_matrix(packages=Main.packages, versions=Main.versions)
-    X = spzeros(length(versions), length(versions))
+    X = zeros(length(versions), length(versions))
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = packages[p1].versions[v1].requires
@@ -290,7 +290,7 @@ end
 
 function package_matrix(versions=Main.versions)
     packages = unique(first.(versions))
-    P = spzeros(length(packages), length(versions))
+    P = zeros(length(packages), length(versions))
     for (i, p1) in enumerate(packages),
         (j, (p2, _)) in enumerate(versions)
         if p1 == p2
@@ -302,7 +302,7 @@ end
 
 function requires_matrix(packages=Main.packages, versions=Main.versions)
     I = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
-    D = spzeros(length(I), length(versions))
+    D = zeros(length(I), length(versions))
     for (j, (pkg, ver)) in enumerate(versions)
         r = packages[pkg].versions[ver].requires
         for dep in keys(r)
@@ -312,24 +312,24 @@ function requires_matrix(packages=Main.packages, versions=Main.versions)
     return D
 end
 
-density(X) = nnz(X)/prod(size(X))
+density(X) = countnz(X)/prod(size(X))
 
 function iterate_dependencies(X, P, R)
     X += I
-    D = max.(0, min.(1, P'R) - X)
-    println("Density 0: $(density(D))")
+    U = max.(0, min.(1, P'R) .- X)
+    P = max.(0, min.(1, U^2) .- X)
+    D = min.(1, U .+ P + I)
     for i = 1:typemax(Int)
-        D′ = max.(0, min.(1, D + D^2) - X)
-        println("Density $i: $(density(D′))")
-        D′ == D && break
-        D = D′
+        println("Density $i: $(density(P))")
+        P = max.(0, min.(1, U*P) .- X)
+        all(P .≤ D) && break
+        D .= min.(1, D .+ P)
     end
     return D
 end
 
-function disjoint_versions(D, versions=Main.versions)
-    F = full(D)
-    max.(0, convert(SparseMatrixCSC{Float64,Int}, F'F .== 0) - X)
+function compat0(D, X, versions=Main.versions)
+    max.(0, (D'X*D .== 0) .- (X + I))
 end
 
 function version_equivalence(X)
@@ -351,7 +351,7 @@ if false
     P = package_matrix()
     R = requires_matrix()
     D = iterate_dependencies(X, P, R)
-    T = disjoint_versions(D)
+    C0 = compat0(D)
 end
 
 ## Package info output routines ##

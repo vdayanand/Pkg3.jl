@@ -347,11 +347,21 @@ function version_equivalence(X)
 end
 
 if false
+    n = length(versions)
     X = incompatibility_matrix()
     P = package_matrix()
     R = requires_matrix()
     D = iterate_dependencies(X, P, R)
-    C0 = compat0(D)
+    C = compat0(D)
+    # analysis of C
+    h = [hash(C[:,i]) for i=1:n]
+    p = sortperm(h)
+    u = sort!(p[[find(diff(h[p])); n]])
+    U = C[u,u]
+    # U is row/col uniqued C
+    R = rref(U)
+    d = round(maximum(filter(x->abs(x) < n, inv.(mod.(R, 1)))))
+    R .= round.(d.*R)
 end
 
 ## Package info output routines ##

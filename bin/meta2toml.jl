@@ -5,6 +5,7 @@ using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
 using SHA
+using RowEchelon
 
 ## General utility functions ##
 
@@ -352,7 +353,7 @@ if false
     P = package_matrix()
     R = requires_matrix()
     D = iterate_dependencies(X, P, R)
-    C = compat0(D)
+    C = compat0(D, X)
     # analysis of C
     h = [hash(C[:,i]) for i=1:n]
     p = sortperm(h)
@@ -362,6 +363,7 @@ if false
     R = rref(U)
     d = round(maximum(filter(x->abs(x) < n, inv.(mod.(R, 1)))))
     R .= round.(d.*R)
+    R[R .== 0] = 0
 end
 
 ## Package info output routines ##

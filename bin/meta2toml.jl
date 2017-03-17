@@ -358,14 +358,10 @@ if false
     p = sortperm(h)
     u = sort!(p[[find(diff(h[p])); n]])
     U = C[u,u]
-    # factorize it!
-    A, B, c = lu(U)
-    @assert A*B ≈ U[c,:]
-    A[abs.(A) .< 1e-8] = 0
-    B[abs.(B) .< 1e-8] = 0
-    @assert A*B ≈ U[c,:]
-    A[0 .< abs.(A)] = 1
-    B[0 .< abs.(B)] = 1
+    # U is row/col uniqued C
+    R = rref(U)
+    d = round(maximum(filter(x->abs(x) < n, inv.(mod.(R, 1)))))
+    R .= round.(d.*R)
 end
 
 ## Package info output routines ##

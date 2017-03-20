@@ -352,18 +352,7 @@ if false
     X = incompatibility_matrix()
     P = package_matrix()
     R = requires_matrix()
-    D = iterate_dependencies(X, P, R)
-    C = compat0(D, X)
-    # analysis of C
-    h = [hash(C[:,i]) for i=1:n]
-    p = sortperm(h)
-    u = sort!(p[[find(diff(h[p])); n]])
-    U = C[u,u]
-    # U is row/col uniqued C
-    R = rref(U)
-    d = round(maximum(filter(x->abs(x) < n, inv.(mod.(R, 1)))))
-    R .= round.(d.*R)
-    R[R .== 0] = 0
+    D₁ = max.(0, P'R .- X) # == (P'R).*(1-X) == min.(P'R, 1.-X)
 end
 
 ## Package info output routines ##

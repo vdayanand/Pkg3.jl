@@ -278,11 +278,11 @@ function representative_versions(pkg::String; packages=Main.packages)
 end
 
 function incompatibility_matrix(packages=Main.packages, versions=Main.versions)
-    X = zeros(length(versions), length(versions))
+    X = spzeros(length(versions), length(versions))
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = packages[p1].versions[v1].requires
-        if p1 == p2 && v1 != v2 || haskey(r, p2) && v2 ∉ r[p2].versions
+        if haskey(r, p2) && v2 ∉ r[p2].versions
             X[i,j] = X[j,i] = 1
         end
     end
@@ -361,11 +361,16 @@ G = 1 - X
 =#
 
 function BronKerboschTomita!(M, G, R, P, X)
+    @show length(R), length(P), length(X)
     # recursion base case
-    isempty(P) && isempty(X) && return push!(M, sort!(R))
-    # find pivot node in P ∪ X minimzing P ∩ N(u)
+    if isempty(P) && isempty(X)
+        push!(M, sort!(R))
+        show(R); println()
+        return
+    end
+    # find pivot node in P ∪ X minimizing P ∩ N(u)
     u, m = 0, typemax(Int)
-    for v in chain(P, X)
+    for V in (P, X), v in V
         n = sum(G[P, v])
         n < m && ((u, m) = (v, n))
     end

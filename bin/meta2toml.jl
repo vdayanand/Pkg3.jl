@@ -348,36 +348,26 @@ function version_equivalence(X)
 end
 
 #=
-X = zeros(Int, 6, 6)
-X[1,2] = 1
-X[1,5] = 1
-X[2,5] = 1
-X[2,3] = 1
-X[3,4] = 1
-X[4,5] = 1
-X[4,6] = 1
+X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
 X += X'
 G = 1 - X
 =#
 
-function BronKerboschTomita!(M, G, R, P, X)
+function BronKerboschTomita(emit, G, R, P, X)
     @show length(R), length(P), length(X)
     # recursion base case
-    if isempty(P) && isempty(X)
-        push!(M, sort!(R))
-        show(R); println()
-        return
-    end
+    isempty(P) && isempty(X) && return emit(R)
     # find pivot node in P ∪ X minimizing P ∩ N(u)
     u, m = 0, typemax(Int)
     for V in (P, X), v in V
         n = sum(G[P, v])
         n < m && ((u, m) = (v, n))
     end
+    @assert u != 0
     # recursion
     for v in intersect(P, find(G[:, u]))
         N = find(G[:, v])
-        BronKerboschTomita!(M, G, [R; v], setdiff(P, N), setdiff(X, N))
+        BronKerboschTomita(emit, G, [R; v], setdiff(P, N), setdiff(X, N))
         filter!(x -> x != v, P)
         push!(X, v)
     end
@@ -386,7 +376,12 @@ end
 function maximal_indepedents_sets(G::AbstractMatrix)
     G = min.(1, G + I) # consider each node its own neighbor
     M = Vector{Vector{Int}}()
-    BronKerboschTomita!(M, G, Int[], collect(1:size(G,1)), Int[])
+    BronKerboschTomita(G, Int[], collect(1:size(G,1)), Int[]) do R
+        push!(M, sort!(R))
+        print(length(M), ": ")
+        show(R)
+        println()
+    end
     return sort!(M, lt=lexless)
 end
 

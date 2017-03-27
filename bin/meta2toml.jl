@@ -353,6 +353,12 @@ X += X'
 G = 1 - X
 =#
 
+"Neighborhood of a node in the graph G, represented as a matrix."
+
+N(G, v) = find(G[:, v])
+
+const \ = setdiff
+
 function BronKerboschTomita(emit, G, R, P, X)
     @show length(R), length(P), length(X)
     # recursion base case
@@ -365,9 +371,9 @@ function BronKerboschTomita(emit, G, R, P, X)
     end
     @assert u != 0
     # recursion
-    for v in intersect(P, find(G[:, u]))
-        N = find(G[:, v])
-        BronKerboschTomita(emit, G, [R; v], setdiff(P, N), setdiff(X, N))
+    for v in P ∩ N(G, u)
+        Nv = N(G, v)
+        BronKerboschTomita(emit, G, [R; v], P \ Nv, X \ Nv)
         filter!(x -> x != v, P)
         push!(X, v)
     end
@@ -379,6 +385,7 @@ function maximal_indepedents_sets(io::IO, G::AbstractMatrix)
     BronKerboschTomita(G, Int[], collect(1:size(G,1)), Int[]) do R
         push!(M, sort!(R))
         println(io, length(M), ": ", join(R, ","))
+        flush(io)
     end
     return sort!(M, lt=lexless)
 end

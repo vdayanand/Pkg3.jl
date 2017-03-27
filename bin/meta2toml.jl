@@ -5,7 +5,7 @@ using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
 using SHA
-using RowEchelon
+using Iterators
 
 ## General utility functions ##
 
@@ -345,6 +345,44 @@ function version_equivalence(X)
         E[j] = v
     end
     return unique(E)
+end
+
+#=
+X = zeros(Int, 6, 6)
+X[1,2] = 1
+X[1,5] = 1
+X[2,5] = 1
+X[2,3] = 1
+X[3,4] = 1
+X[4,5] = 1
+X[4,6] = 1
+X += X'
+G = 1 - X
+=#
+
+function BronKerboschTomita!(M, G, R, P, X)
+    # recursion base case
+    isempty(P) && isempty(X) && return push!(M, sort!(R))
+    # find pivot node in P ∪ X minimzing P ∩ N(u)
+    u, m = 0, typemax(Int)
+    for v in chain(P, X)
+        n = sum(G[P, v])
+        n < m && ((u, m) = (v, n))
+    end
+    # recursion
+    for v in intersect(P, find(G[:, u]))
+        N = find(G[:, v])
+        BronKerboschTomita!(M, G, [R; v], setdiff(P, N), setdiff(X, N))
+        filter!(x -> x != v, P)
+        push!(X, v)
+    end
+end
+
+function maximal_indepedents_sets(G::AbstractMatrix)
+    G = min.(1, G + I) # consider each node its own neighbor
+    M = Vector{Vector{Int}}()
+    BronKerboschTomita!(M, G, Int[], collect(1:size(G,1)), Int[])
+    return sort!(M, lt=lexless)
 end
 
 if false

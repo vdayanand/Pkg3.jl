@@ -356,8 +356,8 @@ G = 1 - X
 function BronKerboschTomita(emit, G, R, P, X)
     @show length(R), length(P), length(X)
     # recursion base case
-    isempty(P) && isempty(X) && return emit(R)
-    # find pivot node in P ∪ X minimizing P ∩ N(u)
+    isempty(P) && isempty(X) && (emit(R); return)
+    # find pivot: u in P ∪ X minimizing P ∩ N(u)
     u, m = 0, typemax(Int)
     for V in (P, X), v in V
         n = sum(G[P, v])
@@ -373,17 +373,19 @@ function BronKerboschTomita(emit, G, R, P, X)
     end
 end
 
-function maximal_indepedents_sets(G::AbstractMatrix)
+function maximal_indepedents_sets(io::IO, G::AbstractMatrix)
     G = min.(1, G + I) # consider each node its own neighbor
     M = Vector{Vector{Int}}()
     BronKerboschTomita(G, Int[], collect(1:size(G,1)), Int[]) do R
         push!(M, sort!(R))
-        print(length(M), ": ")
-        show(R)
-        println()
+        println(io, length(M), ": ", join(R, ","))
     end
     return sort!(M, lt=lexless)
 end
+maximal_indepedents_sets(path::String, G::AbstractMatrix) =
+    open(io->maximal_indepedents_sets(io, G), path, "w")
+maximal_indepedents_sets(G::AbstractMatrix) =
+    maximal_indepedents_sets(STDOUT, G)
 
 if false
     n = length(versions)

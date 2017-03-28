@@ -298,7 +298,7 @@ end
 
 function iterate_dependencies(G, P, R; verbose=false)
     G = max.(0, G - I) # make each node not its own neighbor
-    D = max.(0, min.(1, P'R) .- G)
+    D = max.(0, min.(1, P'R + I) .- G)
     for i = 1:typemax(Int)
         n = nnz(D)
         verbose && println("Density $i: $(n/length(D))")
@@ -350,21 +350,21 @@ function BronKerboschTomita(emit, G, R, P, X)
     end
 end
 
-function maximal_indepedents_sets(io::IO, G::AbstractMatrix)
-    n = Base.LinAlg.checksquare(G)
+function maximal_indepedent_sets(io::IO, G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2)))
     G = min.(1, G + I) # make each node its own neighbor
     M = Vector{Vector{Int}}()
-    BronKerboschTomita(G, Int[], collect(1:n), Int[]) do R
+    BronKerboschTomita(G, Int[], inds, Int[]) do R
         push!(M, sort!(R))
-        println(io, length(M), ": ", join(R, ","))
+        join(io, R, ',')
+        println(io)
         flush(io)
     end
     return sort!(M, lt=lexless)
 end
-maximal_indepedents_sets(path::String, G::AbstractMatrix) =
-    open(io->maximal_indepedents_sets(io, G), path, "w")
-maximal_indepedents_sets(G::AbstractMatrix) =
-    maximal_indepedents_sets(STDOUT, G)
+maximal_indepedent_sets(path::String, G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2))) =
+    open(io->maximal_indepedent_sets(io, G, inds), path, "w")
+maximal_indepedent_sets(G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2))) =
+    maximal_indepedent_sets(STDOUT, G, inds)
 
 ## Package info output routines ##
 

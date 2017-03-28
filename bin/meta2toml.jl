@@ -257,20 +257,19 @@ end
 ## Load package data ##
 
 const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
-const packages = load_packages(dir)
-const m = length(packages)
-prune!(packages)
-
-const versions = [(pkg, ver) for (pkg, p) in packages for (ver, v) in p.versions]
-const n = length(versions)
+const pkgs = load_packages(dir)
+prune!(pkgs)
+const versions = [(pkg, ver) for (pkg, p) in pkgs for (ver, v) in p.versions]
 sort!(versions, by=last)
 sort!(versions, by=lowercase∘first)
+const packages = unique(first(v) for v in versions)
+const m, n = length(pkgs), length(versions)
 
 ## Some computational utility functions ##
 
 function package_map()
     pkgs = zeros(Int, n)
-    for (i, p1) in enumerate(unique(first.(versions))),
+    for (i, p1) in enumerate(packages),
         (j, (p2, _)) in enumerate(versions)
         if p1 == p2
             pkgs[j] = i
@@ -280,8 +279,8 @@ function package_map()
 end
 
 function requires_map()
-    ind = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
-    [sort!([ind[dep] for dep in keys(packages[pkg].versions[ver].requires)])
+    ind = Dict(p => i for (i, p) in enumerate(packages))
+    [sort!([ind[dep] for dep in keys(pkgs[pkg].versions[ver].requires)])
                      for (pkg, ver) in versions]
 end
 
@@ -289,7 +288,7 @@ function incompatibility_matrix()
     G = spzeros(n, n)
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
-        r = packages[p1].versions[v1].requires
+        r = pkgs[p1].versions[v1].requires
         if haskey(r, p2) && v2 ∉ r[p2].versions
             G[i,j] = G[j,i] = 1
         end
@@ -309,14 +308,15 @@ function iterate_dependencies(G, P, R; verbose=false)
     return D
 end
 
-const pkgs = package_map()
-const reqs = requires_map()
+const pkg_map = package_map()
+const req_map = requires_map()
 const G = incompatibility_matrix()
-const P = sparse(pkgs, 1:n, 1.0, m, n)
-const R = let p = [(i, j) for (j, v) in enumerate(reqs) for i in v]
+const P = sparse(pkg_map, 1:n, 1.0, m, n)
+const R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1.0, m, n)
 end
 const D = iterate_dependencies(G, P, R)
+const Dp = min.(1, D*P')
 
 ## Some graph functions ##
 
@@ -419,7 +419,7 @@ end
 # expressed by associating the name with a `version => uuid` table instead of
 # just a single UUID value.
 
-function print_compat_uuids(pkg::String, p::Package; packages=Main.packages)
+function print_compat_uuids(pkg::String, p::Package; pkgs=Main.pkgs)
     print("""
     \t[$pkg.compat.uuids]
     """)
@@ -429,14 +429,14 @@ function print_compat_uuids(pkg::String, p::Package; packages=Main.packages)
     end
     for pkg in sort!(collect(pkgs), by=lowercase)
         print("""
-        \t$pkg = "$(packages[pkg].uuid)"
+        \t$pkg = "$(pkgs[pkg].uuid)"
         """)
     end
     println()
 end
 
-function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
-    uniform, nonunif = compat_versions(p, packages)
+function print_compat_versions(pkg::String, p::Package; pkgs=Main.pkgs)
+    uniform, nonunif = compat_versions(p, pkgs)
     if !isempty(uniform)
         print("""
         \t[$pkg.compat.versions]
@@ -461,9 +461,9 @@ function print_compat_versions(pkg::String, p::Package; packages=Main.packages)
     end
 end
 
-function print_compat(pkg::String, p::Package; packages=Main.packages)
+function print_compat(pkg::String, p::Package; pkgs=Main.pkgs)
     julia = compat_julia(p)
-    uniform, nonunif = compat_versions(p, packages)
+    uniform, nonunif = compat_versions(p, pkgs)
 
     if length(julia) == 1 || !isempty(uniform)
         println("[$pkg]")
@@ -492,7 +492,7 @@ function print_compat(pkg::String, p::Package; packages=Main.packages)
 end
 
 if !isinteractive()
-    for (pkg, p) in sort!(collect(packages), by=lowercase∘first)
+    for (pkg, p) in sort!(collect(pkgs), by=lowercase∘first)
         julia = compat_julia(p)
         print_package_metadata(pkg, p, julia=julia)
         print_versions_sha1(pkg, p)

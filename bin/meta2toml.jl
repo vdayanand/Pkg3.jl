@@ -297,18 +297,14 @@ function incompatibility_matrix()
     return G
 end
 
-density(S) = nnz(S)/length(S)
-
-function iterate_dependencies(G, P, R)
-    G = min.(1, G + I) # make each node its own neighbor
-    U = max.(0, min.(1, P'R) .- G)
-    X = max.(0, min.(1, U^2) .- G)
-    D = min.(1, I + U .+ X)
+function iterate_dependencies(G, P, R; verbose=false)
+    G = max.(0, G - I) # make each node not its own neighbor
+    D = max.(0, min.(1, P'R) .- G)
     for i = 1:typemax(Int)
-        println("Density $i: $(density(D))")
-        X = max.(0, min.(1, U*X) .- G)
-        all(X .≤ D) && break
-        D .= min.(1, D .+ X)
+        n = nnz(D)
+        verbose && println("Density $i: $(n/length(D))")
+        D .= max.(0, min.(1, D^2) .- G)
+        nnz(D) <= n && break
     end
     return D
 end

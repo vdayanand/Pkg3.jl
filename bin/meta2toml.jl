@@ -5,7 +5,6 @@ using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
 using SHA
-using Iterators
 
 ## General utility functions ##
 
@@ -255,10 +254,39 @@ function compat_versions(p::Package, packages=Main.packages)
      sort!(collect(nonunif), by=lowercase∘first))
 end
 
+## Load package data ##
+
+const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
+const packages = load_packages(dir)
+const m = length(packages)
+prune!(packages)
+
+const versions = [(pkg, ver) for (pkg, p) in packages for (ver, v) in p.versions]
+const n = length(versions)
+sort!(versions, by=last)
+sort!(versions, by=lowercase∘first)
+
 ## Some computational utility functions ##
 
-function incompatibility_graph(packages=Main.packages, versions=Main.versions)
-    G = spzeros(length(versions), length(versions))
+function package_map()
+    pkgs = zeros(Int, n)
+    for (i, p1) in enumerate(unique(first.(versions))),
+        (j, (p2, _)) in enumerate(versions)
+        if p1 == p2
+            pkgs[j] = i
+        end
+    end
+    return pkgs
+end
+
+function requires_map()
+    ind = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
+    [sort!([ind[dep] for dep in keys(packages[pkg].versions[ver].requires)])
+                     for (pkg, ver) in versions]
+end
+
+function incompatibility_matrix()
+    G = spzeros(n, n)
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = packages[p1].versions[v1].requires
@@ -269,38 +297,32 @@ function incompatibility_graph(packages=Main.packages, versions=Main.versions)
     return G
 end
 
-function package_map(versions=Main.versions)
-    packages = unique(first.(versions))
-    pkgs = zeros(Int, length(versions))
-    for (i, p1) in enumerate(packages),
-        (j, (p2, _)) in enumerate(versions)
-        if p1 == p2
-            pkgs[j] = i
-        end
+density(S) = nnz(S)/length(S)
+
+function iterate_dependencies(G, P, R)
+    G = min.(1, G + I) # make each node its own neighbor
+    U = max.(0, min.(1, P'R) .- G)
+    X = max.(0, min.(1, U^2) .- G)
+    D = min.(1, I + U .+ X)
+    for i = 1:typemax(Int)
+        println("Density $i: $(density(D))")
+        X = max.(0, min.(1, U*X) .- G)
+        all(X .≤ D) && break
+        D .= min.(1, D .+ X)
     end
-    return pkgs
+    return D
 end
-
-function requires_map(packages=Main.packages, versions=Main.versions)
-    ind = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
-    [sort!([ind[dep] for dep in keys(packages[pkg].versions[ver].requires)])
-                     for (pkg, ver) in versions]
-end
-
-## Load package data and generate registry ##
-
-dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
-packages = load_packages(dir)
-prune!(packages)
-
-versions = [(pkg, ver) for (pkg, p) in packages for (ver, v) in p.versions]
-sort!(versions, by=last)
-sort!(versions, by=lowercase∘first)
 
 const pkgs = package_map()
 const reqs = requires_map()
-const G = incompatibility_graph()
-const n = length(versions)
+const G = incompatibility_matrix()
+const P = sparse(pkgs, 1:n, 1.0, m, n)
+const R = let p = [(i, j) for (j, v) in enumerate(reqs) for i in v]
+    sparse(first.(p), last.(p), 1.0, m, n)
+end
+const D = iterate_dependencies(G, P, R)
+
+## Some graph functions ##
 
 #=
 X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
@@ -309,20 +331,10 @@ G = 1 - X
 =#
 
 "Neighborhood of a node in the graph G, represented as a matrix."
-
 N(G, v) = find(G[:, v])
-
 const \ = setdiff
 
 function BronKerboschTomita(emit, G, R, P, X)
-    # scrub unsatisfiable versions
-    let px = unique(pkgs[v] for V in (R, P) for v in V)
-        for V in (R, P, X)
-            filter!(V) do v
-                all(r in px for r in reqs[v])
-            end
-        end
-    end
     @show length(R), length(P), length(X)
     # recursion base case
     isempty(P) && isempty(X) && (emit(R); return)
@@ -343,9 +355,10 @@ function BronKerboschTomita(emit, G, R, P, X)
 end
 
 function maximal_indepedents_sets(io::IO, G::AbstractMatrix)
-    G = min.(1, G + I) # consider each node its own neighbor
+    n = Base.LinAlg.checksquare(G)
+    G = min.(1, G + I) # make each node its own neighbor
     M = Vector{Vector{Int}}()
-    BronKerboschTomita(G, Int[], collect(1:size(G,1)), Int[]) do R
+    BronKerboschTomita(G, Int[], collect(1:n), Int[]) do R
         push!(M, sort!(R))
         println(io, length(M), ": ", join(R, ","))
         flush(io)

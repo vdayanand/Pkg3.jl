@@ -257,95 +257,50 @@ end
 
 ## Some computational utility functions ##
 
-function representative_versions(pkg::String; packages=Main.packages)
-    p = packages[pkg]
-    versions = sort!(collect(keys(p.versions)))
-    rep = pop!(versions)
-    reps = [rep]
-    while !isempty(versions)
-        rep′ = pop!(versions)
-        for (pkg′, p′) in packages, (ver, v) in p′.versions
-            haskey(v.requires, pkg) || continue
-            vers = v.requires[pkg].versions
-            if (rep in vers) ⊻ (rep′ in vers)
-                push!(reps, rep′)
-                rep = rep′
-                break
-            end
-        end
-    end
-    return reverse!(reps)
-end
-
-function incompatibility_matrix(packages=Main.packages, versions=Main.versions)
-    X = spzeros(length(versions), length(versions))
+function incompatibility_graph(packages=Main.packages, versions=Main.versions)
+    G = spzeros(length(versions), length(versions))
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = packages[p1].versions[v1].requires
         if haskey(r, p2) && v2 ∉ r[p2].versions
-            X[i,j] = X[j,i] = 1
+            G[i,j] = G[j,i] = 1
         end
     end
-    return X
+    return G
 end
 
-function package_matrix(versions=Main.versions)
+function package_map(versions=Main.versions)
     packages = unique(first.(versions))
-    P = zeros(length(packages), length(versions))
+    pkgs = zeros(Int, length(versions))
     for (i, p1) in enumerate(packages),
         (j, (p2, _)) in enumerate(versions)
         if p1 == p2
-            P[i,j] = 1
+            pkgs[j] = i
         end
     end
-    return P
+    return pkgs
 end
 
-function requires_matrix(packages=Main.packages, versions=Main.versions)
-    I = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
-    D = zeros(length(I), length(versions))
-    for (j, (pkg, ver)) in enumerate(versions)
-        r = packages[pkg].versions[ver].requires
-        for dep in keys(r)
-            D[I[dep],j] = 1
-        end
-    end
-    return D
+function requires_map(packages=Main.packages, versions=Main.versions)
+    ind = Dict(p => i for (i, p) in enumerate(unique(first.(versions))))
+    [sort!([ind[dep] for dep in keys(packages[pkg].versions[ver].requires)])
+                     for (pkg, ver) in versions]
 end
 
-density(X) = countnz(X)/prod(size(X))
+## Load package data and generate registry ##
 
-function iterate_dependencies(X, P, R)
-    X += I
-    U = max.(0, min.(1, P'R) .- X)
-    P = max.(0, min.(1, U^2) .- X)
-    D = min.(1, U .+ P + I)
-    for i = 1:typemax(Int)
-        println("Density $i: $(density(P))")
-        P = max.(0, min.(1, U*P) .- X)
-        all(P .≤ D) && break
-        D .= min.(1, D .+ P)
-    end
-    return D
-end
+dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
+packages = load_packages(dir)
+prune!(packages)
 
-function compat0(D, X, versions=Main.versions)
-    max.(0, (D'X*D .== 0) .- (X + I))
-end
+versions = [(pkg, ver) for (pkg, p) in packages for (ver, v) in p.versions]
+sort!(versions, by=last)
+sort!(versions, by=lowercase∘first)
 
-function version_equivalence(X)
-    E = Vector{Vector{Int}}(size(X,2))
-    for j = 1:size(X,2)
-        isassigned(E, j) && continue
-        v = [j]
-        for k = j+1:size(X,2)
-            X[:,j] != X[:,k] && continue
-            E[k] = push!(v, k)
-        end
-        E[j] = v
-    end
-    return unique(E)
-end
+const pkgs = package_map()
+const reqs = requires_map()
+const G = incompatibility_graph()
+const n = length(versions)
 
 #=
 X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
@@ -360,10 +315,18 @@ N(G, v) = find(G[:, v])
 const \ = setdiff
 
 function BronKerboschTomita(emit, G, R, P, X)
+    # scrub unsatisfiable versions
+    let px = unique(pkgs[v] for V in (R, P) for v in V)
+        for V in (R, P, X)
+            filter!(V) do v
+                all(r in px for r in reqs[v])
+            end
+        end
+    end
     @show length(R), length(P), length(X)
     # recursion base case
     isempty(P) && isempty(X) && (emit(R); return)
-    # find pivot: u in P ∪ X minimizing P ∩ N(u)
+    # pivot: u in P ∪ X minimizing P ∩ N(G, u)
     u, m = 0, typemax(Int)
     for V in (P, X), v in V
         n = sum(G[P, v])
@@ -393,14 +356,6 @@ maximal_indepedents_sets(path::String, G::AbstractMatrix) =
     open(io->maximal_indepedents_sets(io, G), path, "w")
 maximal_indepedents_sets(G::AbstractMatrix) =
     maximal_indepedents_sets(STDOUT, G)
-
-if false
-    n = length(versions)
-    X = incompatibility_matrix()
-    P = package_matrix()
-    R = requires_matrix()
-    D₁ = max.(0, P'R .- X) # == (P'R).*(1-X) == min.(P'R, 1.-X)
-end
 
 ## Package info output routines ##
 
@@ -526,17 +481,6 @@ function print_compat(pkg::String, p::Package; packages=Main.packages)
         println()
     end
 end
-
-## Load package data and generate registry ##
-
-dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
-
-packages = load_packages(dir)
-prune!(packages)
-
-versions = [(pkg, ver) for (pkg, p) in packages for (ver, v) in p.versions]
-sort!(versions, by=last)
-sort!(versions, by=lowercase∘first)
 
 if !isinteractive()
     for (pkg, p) in sort!(collect(packages), by=lowercase∘first)

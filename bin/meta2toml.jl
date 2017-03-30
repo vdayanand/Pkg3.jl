@@ -366,7 +366,7 @@ end
 function maximal_indepedent_sets(io::IO, G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2)))
     G = min.(1, G + I) # make each node its own neighbor
     M = Vector{Vector{Int}}()
-    BronKerboschTomita(G, Int[], inds, Int[]) do R
+    BronKerboschTomita(G, Int[], copy(inds), Int[]) do R
         push!(M, sort!(R))
         join(io, R, ',')
         println(io)

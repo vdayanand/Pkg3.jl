@@ -379,6 +379,16 @@ maximal_indepedent_sets(path::String, G::AbstractMatrix, inds::Vector{Int} = col
 maximal_indepedent_sets(G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2))) =
     maximal_indepedent_sets(STDOUT, G, inds)
 
+function is_satisfied(V::Vector{Int})
+    provided = unique(pkg_map[v] for v in V)
+    required = unique(r for v in V for r in req_map[v])
+    required ⊆ provided
+end
+
+function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
+    minimum(sum(G[V, inds\V], 1)) > 0
+end
+
 ## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))

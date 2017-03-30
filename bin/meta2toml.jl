@@ -263,6 +263,7 @@ const versions = [(pkg, ver) for (pkg, p) in pkgs for (ver, v) in p.versions]
 sort!(versions, by=last)
 sort!(versions, by=lowercase∘first)
 const packages = unique(first(v) for v in versions)
+const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
 const m, n = length(pkgs), length(versions)
 
 ## Some computational utility functions ##

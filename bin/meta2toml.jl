@@ -331,6 +331,18 @@ N(G, v) = find(G[:, v])
 const \ = setdiff
 
 function BronKerboschTomita(emit, G, R, P, X)
+    let available = unique(pkg_map[v] for V in (R, P) for v in V)
+        # if any in R are unsatisfiable, return
+        for v in R, r in req_map[v]
+            r in available || return
+        end
+        # scrub unsatisfiable versions from P & X
+        for V in (P, X)
+            filter!(V) do v
+                all(r in available for r in req_map[v])
+            end
+        end
+    end
     @show length(R), length(P), length(X)
     # recursion base case
     isempty(P) && isempty(X) && (emit(R); return)

@@ -389,6 +389,31 @@ function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
     minimum(sum(G[V, inds\V], 1)) > 0
 end
 
+#=
+G = rand(10, 10)
+T = float(G .< G')
+T + T' + I == ones(T)
+=#
+
+function tournament_factorizing_permutation(T::AbstractMatrix)
+    n = Base.LinAlg.checksquare(T)
+    P = [collect(1:n)]
+    for i = 1:n
+        for (j, C) in enumerate(P)
+            i in C || continue
+            A = filter(k -> k != i && T[i,k] == 0, C)
+            B = filter(k -> k != i && T[i,k] != 0, C)
+            deleteat!(P, j)
+            !isempty(B) && insert!(P, j, B)
+            insert!(P, j, [i])
+            !isempty(A) && insert!(P, j, A)
+            break
+        end
+    end
+    @assert extrema(map(length, P)) == (1, 1)
+    first.(P)
+end
+
 ## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))

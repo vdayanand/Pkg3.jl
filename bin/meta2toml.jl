@@ -324,7 +324,7 @@ const Dp = min.(1, D*P')
 #=
 X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
 X += X'
-G = 1 - X
+G = dropzeros!(1 - X)
 =#
 
 "Neighborhood of a node in the graph G, represented as a matrix."
@@ -390,9 +390,15 @@ function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
 end
 
 #=
-G = rand(10, 10)
+n = 5
+G = rand(n, n)
 T = float(G .< G')
 T + T' + I == ones(T)
+p = tournament_factorizing_permutation(T)
+modules = filter(collect(subsets(1:n))) do S
+    rank(T[S,(1:n)\S]) <= 1
+end
+all(M->all(x->x == 1, diff(findin(M, p))), modules)
 =#
 
 function tournament_factorizing_permutation(T::AbstractMatrix)
@@ -402,7 +408,7 @@ function tournament_factorizing_permutation(T::AbstractMatrix)
         for (j, C) in enumerate(P)
             i in C || continue
             A = filter(k -> k != i && T[i,k] == 0, C)
-            B = filter(k -> k != i && T[i,k] != 0, C)
+            B = filter(k -> k != i && T[k,i] == 0, C)
             deleteat!(P, j)
             !isempty(B) && insert!(P, j, B)
             insert!(P, j, [i])

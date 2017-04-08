@@ -389,6 +389,8 @@ function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
     minimum(sum(G[V, inds\V], 1)) > 0
 end
 
+## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
+
 #=
 n = 5
 G = rand(n, n)
@@ -420,6 +422,8 @@ function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     end
     return p
 end
+
+## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
 
 #=
 Brute force common intervals:

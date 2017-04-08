@@ -389,6 +389,8 @@ function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
     minimum(sum(G[V, inds\V], 1)) > 0
 end
 
+is_module(G::AbstractMatrix, S::Vector{Int}) = rank(G[S,(1:size(G,2))\S]) <= 1
+
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
 
 #=
@@ -397,9 +399,7 @@ G = rand(n, n)
 T = float(G .< G')
 @assert T + T' + I == ones(T)
 p = tournament_factorizing_permutation(T)
-modules = filter(collect(subsets(1:n))) do S
-    rank(T[S,(1:n)\S]) <= 1
-end
+modules = filter(S->is_module(T, S), collect(subsets(1:n)))
 @assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
 =#
 
@@ -453,6 +453,23 @@ function common_intervals(p1::Vector{Int}, p2::Vector{Int})
     end
     return intervals
 end
+
+#=
+G = full(sparse(
+    [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
+     5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
+     8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
+    [2, 3, 4, 1, 4, 5, 6, 7, 1, 4, 5, 6, 7, 1, 2, 3, 5, 6, 7, 2,
+     3, 4, 6, 7, 2, 3, 4, 5, 8, 9, 10, 11, 2, 3, 4, 5, 8, 9, 10,
+     11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
+    1.0
+))
+T1 = [i < j ? G[i,j] : 1-G[j,i] for i = 1:size(G,1), j = 1:size(G,2)]
+T2 = [i ≥ j ? G[i,j] : 1-G[j,i] for i = 1:size(G,1), j = 1:size(G,2)]
+p1 = tournament_factorizing_permutation(T1)
+p2 = tournament_factorizing_permutation(T2)
+common_intervals(p1, p2)
+=#
 
 ## Package info output routines ##
 

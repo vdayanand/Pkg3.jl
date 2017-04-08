@@ -421,6 +421,35 @@ function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     return p
 end
 
+#=
+Brute force common intervals:
+[(x,y,l,u) for x=1:n-1 for y=x+1:n for l=1:n-1 for u=l+1:n if sort!(p1[x:y]) == sort!(p2[l:u])]
+=#
+
+function common_intervals(emit::Function, p::Vector{Int})
+    for x = 1:length(p)-1
+        l = u = p[x]
+        for y = x+1:length(p)
+            v = p[y]
+            l, u = min(v, l), max(v, u)
+            y - x < u - l && continue
+            y - x > u - l && break
+            emit(x, y, l, u)
+        end
+    end
+end
+
+common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
+    common_intervals(emit, invperm(p2)[p1])
+
+function common_intervals(p1::Vector{Int}, p2::Vector{Int})
+    intervals = NTuple{4,Int}[]
+    common_intervals(p1, p2) do x, y, l, u
+        push!(intervals, (x, y, l, u))
+    end
+    return intervals
+end
+
 ## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))

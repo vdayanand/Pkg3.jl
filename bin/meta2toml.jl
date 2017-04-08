@@ -393,31 +393,32 @@ end
 n = 5
 G = rand(n, n)
 T = float(G .< G')
-T + T' + I == ones(T)
+@assert T + T' + I == ones(T)
 p = tournament_factorizing_permutation(T)
 modules = filter(collect(subsets(1:n))) do S
     rank(T[S,(1:n)\S]) <= 1
 end
-all(M->all(x->x == 1, diff(findin(M, p))), modules)
+@assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
 =#
 
-function tournament_factorizing_permutation(T::AbstractMatrix)
-    n = Base.LinAlg.checksquare(T)
-    P = [collect(1:n)]
-    for i = 1:n
-        for (j, C) in enumerate(P)
-            i in C || continue
-            A = filter(k -> k != i && T[i,k] == 0, C)
-            B = filter(k -> k != i && T[k,i] == 0, C)
-            deleteat!(P, j)
-            !isempty(B) && insert!(P, j, B)
-            insert!(P, j, [i])
-            !isempty(A) && insert!(P, j, A)
-            break
+tournament_factorizing_permutation(T::AbstractMatrix) =
+    tfp!(T, collect(1:size(T,2)))
+
+function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
+    if hi - lo > 1
+        v = p[lo]
+        i, j = lo + 1, hi
+        while true
+            while i < j && T[v,p[i]] == 0; i += 1; end;
+            while i < j && T[p[j],v] == 0; j -= 1; end;
+            i < j || break
+            p[i], p[j] = p[j], p[i]
         end
+        p[j], p[lo] = v, p[j]
+        tfp!(T, p, lo, j-1)
+        tfp!(T, p, j+1, hi)
     end
-    @assert extrema(map(length, P)) == (1, 1)
-    first.(P)
+    return p
 end
 
 ## Package info output routines ##

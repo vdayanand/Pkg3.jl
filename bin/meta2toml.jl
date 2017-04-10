@@ -458,8 +458,8 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
         v = p[lo]
         i, j = lo + 1, hi
         while true
-            while i < j && G[v,p[i]] != 0; i += 1; end;
-            while i < j && G[v,p[j]] == 0; j -= 1; end;
+            while i < j && G[v,p[i]] == 0; i += 1; end;
+            while i < j && G[v,p[j]] != 0; j -= 1; end;
             i < j || break
             p[i], p[j] = p[j], p[i]
         end
@@ -473,7 +473,7 @@ end
 
 #=
 Brute force common intervals:
-[(x,y,l,u) for x=1:n-1 for y=x+1:n for l=1:n-1 for u=l+1:n if sort!(p1[x:y]) == sort!(p2[l:u])]
+[(x,y) for x=1:n-1 for y=x+1:n for l=1:n-1 for u=l+1:n if sort!(p1[x:y]) == sort!(p2[l:u])]
 =#
 
 function common_intervals(emit::Function, p::Vector{Int})
@@ -484,21 +484,23 @@ function common_intervals(emit::Function, p::Vector{Int})
             l, u = min(v, l), max(v, u)
             y - x < u - l && continue
             y - x > u - l && break
-            emit(x, y, l, u)
+            emit(x, y)
         end
     end
 end
 
-common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
-    common_intervals(emit, invperm(p2)[p1])
-
-function common_intervals(p1::Vector{Int}, p2::Vector{Int})
-    intervals = NTuple{4,Int}[]
-    common_intervals(p1, p2) do x, y, l, u
-        push!(intervals, (x, y, l, u))
+function common_intervals(p::Vector{Int})
+    intervals = NTuple{2,Int}[]
+    common_intervals(p) do x, y
+        push!(intervals, (x, y))
     end
     return intervals
 end
+
+common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
+    common_intervals(emit, invperm(p2)[p1])
+common_intervals(p1::Vector{Int}, p2::Vector{Int}) =
+    common_intervals(invperm(p2)[p1])
 
 ## Package info output routines ##
 

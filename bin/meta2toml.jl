@@ -427,6 +427,18 @@ function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
 end
 
 #=
+G = full(sparse(
+    [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
+     5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
+     8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
+    [2, 3, 4, 1, 4, 5, 6, 7, 1, 4, 5, 6, 7, 1, 2, 3, 5, 6, 7, 2,
+     3, 4, 6, 7, 2, 3, 4, 5, 8, 9, 10, 11, 2, 3, 4, 5, 8, 9, 10,
+     11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
+    1.0
+))
+=#
+
+#=
 n = 6
 G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
 G .= G .⊻ G'
@@ -486,23 +498,6 @@ function common_intervals(p1::Vector{Int}, p2::Vector{Int})
     end
     return intervals
 end
-
-#=
-G = full(sparse(
-    [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
-     5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
-     8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
-    [2, 3, 4, 1, 4, 5, 6, 7, 1, 4, 5, 6, 7, 1, 2, 3, 5, 6, 7, 2,
-     3, 4, 6, 7, 2, 3, 4, 5, 8, 9, 10, 11, 2, 3, 4, 5, 8, 9, 10,
-     11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
-    1.0
-))
-T1 = [i < j ? G[i,j] : 1-G[j,i] for i = 1:size(G,1), j = 1:size(G,2)]
-T2 = [i ≥ j ? G[i,j] : 1-G[j,i] for i = 1:size(G,1), j = 1:size(G,2)]
-p1 = tournament_factorizing_permutation(T1)
-p2 = tournament_factorizing_permutation(T2)
-common_intervals(p1, p2)
-=#
 
 ## Package info output routines ##
 

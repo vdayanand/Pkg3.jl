@@ -472,11 +472,11 @@ end
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
 
 #=
-Brute force common intervals:
+Brute force all common intervals:
 [(x,y) for x=1:n-1 for y=x+1:n for l=1:n-1 for u=l+1:n if sort!(p1[x:y]) == sort!(p2[l:u])]
 =#
 
-function common_intervals(emit::Function, p::Vector{Int})
+function all_common_intervals(emit::Function, p::Vector{Int})
     for x = 1:length(p)-1
         l = u = p[x]
         for y = x+1:length(p)
@@ -489,18 +489,18 @@ function common_intervals(emit::Function, p::Vector{Int})
     end
 end
 
-function common_intervals(p::Vector{Int})
+function all_common_intervals(p::Vector{Int})
     intervals = NTuple{2,Int}[]
-    common_intervals(p) do x, y
+    all_common_intervals(p) do x, y
         push!(intervals, (x, y))
     end
     return intervals
 end
 
-common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
-    common_intervals(emit, invperm(p2)[p1])
-common_intervals(p1::Vector{Int}, p2::Vector{Int}) =
-    common_intervals(invperm(p2)[p1])
+all_common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
+    all_common_intervals(emit, invperm(p2)[p1])
+all_common_intervals(p1::Vector{Int}, p2::Vector{Int}) =
+    all_common_intervals(invperm(p2)[p1])
 
 ## Package info output routines ##
 

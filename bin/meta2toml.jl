@@ -455,13 +455,14 @@ graph_factorizing_permutation(G::AbstractMatrix) =
 
 function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     if hi - lo > 1
-        v = p[lo]
-        i, j = lo + 1, hi
+        x = p[lo]
+        i, j = lo+1, hi
         while true
-            while i < j && G[v,p[i]] == 0; i += 1; end;
-            while i < j && G[v,p[j]] != 0; j -= 1; end;
+            while i < j && G[x,p[i]] == 0; i += 1; end;
+            while i < j && G[x,p[j]] != 0; j -= 1; end;
             i < j || break
             p[i], p[j] = p[j], p[i]
+            i += 1; j -= 1
         end
         gfp!(G, p, lo+1, j)
         gfp!(G, p, j+1, hi)

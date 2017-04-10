@@ -426,6 +426,36 @@ function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     return p
 end
 
+#=
+n = 6
+G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
+G .= G .⊻ G'
+@assert G == G'
+p = graph_factorizing_permutation(G)
+modules = filter!(S->is_module(G, S), collect(subsets(1:n)))
+@assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
+=#
+
+graph_factorizing_permutation(G::AbstractMatrix) =
+    gfp!(G, collect(1:Base.LinAlg.checksquare(G)))
+
+function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
+    if hi - lo > 1
+        v = p[lo]
+        i, j = lo + 1, hi
+        while true
+            while i < j && G[v,p[i]] == 0; i += 1; end;
+            while i < j && G[v,p[j]] != 0; j -= 1; end;
+            i < j || break
+            p[i], p[j] = p[j], p[i]
+        end
+        p[j], p[lo] = v, p[j]
+        gfp!(G, p, lo, j-1)
+        gfp!(G, p, j+1, hi)
+    end
+    return p
+end
+
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
 
 #=

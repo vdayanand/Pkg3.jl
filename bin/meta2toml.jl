@@ -476,6 +476,17 @@ Brute force all common intervals:
 [(x,y) for x=1:n-1 for y=x+1:n for l=1:n-1 for u=l+1:n if sort!(p1[x:y]) == sort!(p2[l:u])]
 =#
 
+function cif(p, i, j)
+    i < j || return -1
+    l, u = extrema(p[k] for k = i:j)
+    (u-l) - (j-i)
+end
+
+if false
+    n = length(p)
+    F = [cif(p, i, j) for i = 1:n, j = 1:n]
+end
+
 function all_common_intervals(emit::Function, p::Vector{Int})
     for x = 1:length(p)-1
         l = u = p[x]

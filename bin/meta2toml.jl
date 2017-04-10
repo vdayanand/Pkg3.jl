@@ -436,6 +436,7 @@ G = full(sparse(
      11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
     1.0
 ))
+n = Base.LinAlg.checksquare(G)
 =#
 
 #=
@@ -446,6 +447,7 @@ G .= G .⊻ G'
 p = graph_factorizing_permutation(G)
 modules = filter!(S->is_module(G, S), collect(subsets(1:n)))
 @assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
+strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
 =#
 
 graph_factorizing_permutation(G::AbstractMatrix) =
@@ -456,13 +458,12 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
         v = p[lo]
         i, j = lo + 1, hi
         while true
-            while i < j && G[v,p[i]] == 0; i += 1; end;
-            while i < j && G[v,p[j]] != 0; j -= 1; end;
+            while i < j && G[v,p[i]] != 0; i += 1; end;
+            while i < j && G[v,p[j]] == 0; j -= 1; end;
             i < j || break
             p[i], p[j] = p[j], p[i]
         end
-        p[j], p[lo] = v, p[j]
-        gfp!(G, p, lo, j-1)
+        gfp!(G, p, lo+1, j)
         gfp!(G, p, j+1, hi)
     end
     return p

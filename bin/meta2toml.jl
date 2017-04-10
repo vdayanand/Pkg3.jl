@@ -389,7 +389,10 @@ function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
     minimum(sum(G[V, inds\V], 1)) > 0
 end
 
-is_module(G::AbstractMatrix, S::Vector{Int}) = rank(G[S,(1:size(G,2))\S]) <= 1
+is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
+    all(G[i,k] == G[j,k] for i in S for j in S for k in indices(G,2)\S)
+
+overlap(A::Vector, B::Vector) = !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
 
@@ -404,7 +407,7 @@ modules = filter(S->is_module(T, S), collect(subsets(1:n)))
 =#
 
 tournament_factorizing_permutation(T::AbstractMatrix) =
-    tfp!(T, collect(1:size(T,2)))
+    tfp!(T, collect(1:Base.LinAlg.checksquare(T)))
 
 function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     if hi - lo > 1

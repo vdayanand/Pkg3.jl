@@ -437,6 +437,7 @@ G = full(sparse(
     1.0
 ))
 n = Base.LinAlg.checksquare(G)
+p = collect(1:n)
 =#
 
 #=
@@ -479,6 +480,7 @@ G = full(sparse(
     1.0
 ))
 n = Base.LinAlg.checksquare(G)
+p = collect(1:n)
 =#
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
@@ -511,7 +513,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             for _ = 1:op[j]; push!(s, j); end
             for _ = 1:cl[j]
                 i = pop!(s)
-                if op[i] <= 1 && i < j
+                if i < j
                     l = minimum(lc[k] for k = i:j-1)
                     u = maximum(uc[k] for k = i+1:j)
                     i <= l && u <= j && continue
@@ -530,16 +532,17 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             end
             push!(st[end], p[j])
             for _ = 1:cl[j]
-                pop!(st)
+                t = pop!(st)
+                length(t) == 1 && append!(t, pop!(t))
             end
         end
         st[end]
     end
+    while length(t) == 1 && t[1] isa Vector
+        t = t[1]
+    end
     return t
 end
-
-fv(v::Vector) = fv(v[1])
-fv(x::Any) = x
 
 function print_tree(io::IO, tr::Vector)
     print(io, "[")

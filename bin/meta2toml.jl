@@ -485,15 +485,15 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     n = length(p)
     op = zeros(Int, n)
     cl = zeros(Int, n)
-    fc = collect(1:n)
     lc = collect(1:n)
+    uc = collect(1:n)
     for j = 1:n-1
         for i = 1:j-1
             G[p[i],p[j]] == G[p[i],p[j+1]] &&
             G[p[j],p[i]] == G[p[j+1],p[i]] && continue
             op[i] += 1
             cl[j] += 1
-            fc[j+1] = i
+            lc[j] = i
             break
         end
         j += 1
@@ -502,19 +502,34 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             G[p[j-1],p[i]] == G[p[j],p[i]] && continue
             op[j] += 1
             cl[i] += 1
-            lc[j] = i
+            uc[j] = i
             break
+        end
+    end
+    s = Int[]
+    for j = 1:n
+        for _ = 1:op[j]; push!(s, j); end
+        for _ = 1:cl[j]
+            i = pop!(s)
+            if i < j
+                l = minimum(lc[k] for k = i:j-1)
+                u = maximum(uc[k] for k = i+1:j)
+                println((i, j) => (l, u))
+                i <= l && u <= j && continue
+            end
+            op[i] -= 1
+            cl[j] -= 1
         end
     end
     st = Any[[]]
     for j = 1:n
-        for i = 1:op[j]
+        for _ = 1:op[j]
             t = []
             push!(st[end], t)
             push!(st, t)
         end
         push!(st[end], p[j])
-        for i = 1:cl[j]
+        for _ = 1:cl[j]
             pop!(st)
         end
     end

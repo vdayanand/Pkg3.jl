@@ -470,41 +470,74 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     return p
 end
 
+#=
+G = full(sparse(
+    [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8,
+     10, 10, 10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13],
+    [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9,
+     10, 11, 12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12],
+    1.0, 14, 14
+))
+n = Base.LinAlg.checksquare(G)
+=#
+
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
     op = zeros(Int, n)
     cl = zeros(Int, n)
+    fc = collect(1:n)
+    lc = collect(1:n)
     for j = 1:n-1
         for i = 1:j-1
-            G[p[i],p[j]] == G[p[i],p[j+1]] && continue
+            G[p[i],p[j]] == G[p[i],p[j+1]] &&
+            G[p[j],p[i]] == G[p[j+1],p[i]] && continue
             op[i] += 1
             cl[j] += 1
+            fc[j] = i
             break
         end
         j += 1
         for i = n:-1:j+1
-            G[p[i],p[j-1]] == G[p[i],p[j]] && continue
+            G[p[i],p[j-1]] == G[p[i],p[j]] &&
+            G[p[j-1],p[i]] == G[p[j],p[i]] && continue
             op[j] += 1
             cl[i] += 1
+            lc[j] = i
             break
         end
     end
-    m = min(op[1], cl[n])
-    op[1] -= m
-    cl[n] -= m
-    tr, st = [], []
+    st = Any[[]]
+    sf, sl = [n], [1]
     for i = 1:n
         for _ = 1:op[i]
-            push!(st, tr)
-            tr = push!(tr, [])[end]
+            t = []
+            push!(st[end], t)
+            push!(st, t)
+            push!(sf, n)
+            push!(sl, 1)
         end
-        push!(tr, p[i])
+        push!(st[end], p[i])
+        if length(st[end]) > 1
+            sf[end] = min(sf[end], fc[i-1])
+            sl[end] = max(sl[end], lc[i])
+        end
         for _ = 1:cl[i]
-            tr = pop!(st)
+            t = pop!(st)
+            f = pop!(sf)
+            l = pop!(sl)
+            sf[end] = min(sf[end], f)
+            sl[end] = max(sl[end], l)
+            if !(fv(t) <= f <= l <= i)
+                @show t => (fv(t), f, l, i)
+                append!(st[end], pop!(st[end]))
+            end
         end
     end
-    return tr
+    return st[end]
 end
+
+fv(v::Vector) = fv(v[1])
+fv(x::Any) = x
 
 function print_tree(io::IO, tr::Vector)
     print(io, "[")

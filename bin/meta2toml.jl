@@ -483,8 +483,8 @@ n = Base.LinAlg.checksquare(G)
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
-    op = zeros(Int, n)
-    cl = zeros(Int, n)
+    op = zeros(Int,n)
+    cl = zeros(Int,n)
     lc = collect(1:n)
     uc = collect(1:n)
     for j = 1:n-1
@@ -506,34 +506,36 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             break
         end
     end
-    s = Int[]
-    for j = 1:n
-        for _ = 1:op[j]; push!(s, j); end
-        for _ = 1:cl[j]
-            i = pop!(s)
-            if i < j
-                l = minimum(lc[k] for k = i:j-1)
-                u = maximum(uc[k] for k = i+1:j)
-                println((i, j) => (l, u))
-                i <= l && u <= j && continue
+    let s = Int[]
+        for j = 1:n
+            for _ = 1:op[j]; push!(s, j); end
+            for _ = 1:cl[j]
+                i = pop!(s)
+                if op[i] <= 1 && i < j
+                    l = minimum(lc[k] for k = i:j-1)
+                    u = maximum(uc[k] for k = i+1:j)
+                    i <= l && u <= j && continue
+                end
+                op[i] -= 1
+                cl[j] -= 1
             end
-            op[i] -= 1
-            cl[j] -= 1
         end
     end
-    st = Any[[]]
-    for j = 1:n
-        for _ = 1:op[j]
-            t = []
-            push!(st[end], t)
-            push!(st, t)
+    t = let st = Any[[]]
+        for j = 1:n
+            for _ = 1:op[j]
+                t = []
+                push!(st[end], t)
+                push!(st, t)
+            end
+            push!(st[end], p[j])
+            for _ = 1:cl[j]
+                pop!(st)
+            end
         end
-        push!(st[end], p[j])
-        for _ = 1:cl[j]
-            pop!(st)
-        end
+        st[end]
     end
-    return st[end]
+    return t
 end
 
 fv(v::Vector) = fv(v[1])

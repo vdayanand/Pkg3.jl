@@ -458,8 +458,8 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
         x = p[lo]
         i, j = lo+1, hi
         while true
-            while i < j && G[x,p[i]] == 0; i += 1; end;
-            while i < j && G[x,p[j]] != 0; j -= 1; end;
+            while i < j && G[p[i],x] == 0; i += 1; end;
+            while i < j && G[p[j],x] != 0; j -= 1; end;
             i < j || break
             p[i], p[j] = p[j], p[i]
             i += 1; j -= 1
@@ -468,6 +468,22 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
         gfp!(G, p, j+1, hi)
     end
     return p
+end
+
+function lfrac(G::AbstractMatrix, p::Vector{Int}, i::Int, j::Int=i+1)
+    m = min(i, j)
+    for k = 1:m-1
+        G[p[k],p[i]] != G[p[k],p[j]] && return k:m
+    end
+    return m+1:m
+end
+
+function rfrac(G::AbstractMatrix, p::Vector{Int}, i::Int, j::Int=i+1)
+    m = max(i, j)
+    for k = length(p):-1:m+1
+        G[p[k],p[i]] != G[p[k],p[j]] && return m:k
+    end
+    return m:m-1
 end
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"

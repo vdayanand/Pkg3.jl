@@ -507,34 +507,21 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
         end
     end
     st = Any[[]]
-    sf, sl = [n], [1]
     for i = 1:n
         for _ = 1:op[i]
             t = []
             push!(st[end], t)
             push!(st, t)
-            push!(sf, n)
-            push!(sl, 1)
         end
         push!(st[end], p[i])
-        if length(st[end]) > 1
-            sf[end] = min(sf[end], fc[i-1])
-            sl[end] = max(sl[end], lc[i])
-        end
         for _ = 1:cl[i]
-            t = pop!(st)
-            f = pop!(sf)
-            l = pop!(sl)
-            sf[end] = min(sf[end], f)
-            sl[end] = max(sl[end], l)
-            if !(fv(t) <= f <= l <= i)
-                @show t => (fv(t), f, l, i)
-                append!(st[end], pop!(st[end]))
-            end
+            pop!(st)
         end
     end
     return st[end]
 end
+
+
 
 fv(v::Vector) = fv(v[1])
 fv(x::Any) = x

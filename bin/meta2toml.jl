@@ -472,27 +472,50 @@ end
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
-    op, cl = Int[], Int[]
+    op = zeros(Int, n)
+    cl = zeros(Int, n)
     for j = 1:n-1
         for i = 1:j-1
             G[p[i],p[j]] == G[p[i],p[j+1]] && continue
-            push!(op, i)
-            push!(cl, j)
+            op[i] += 1
+            cl[j] += 1
             break
         end
         j += 1
         for i = n:-1:j+1
             G[p[i],p[j-1]] == G[p[i],p[j]] && continue
-            push!(op, j)
-            push!(cl, i)
+            op[j] += 1
+            cl[i] += 1
             break
         end
     end
-    o, c = zeros(Int, n), zeros(Int, n)
-    for i in op; o[i] += 1; end
-    for i in cl; c[i] += 1; end
-    
+    m = min(op[1], cl[n])
+    op[1] -= m
+    cl[n] -= m
+    tr, st = [], []
+    for i = 1:n
+        for _ = 1:op[i]
+            push!(st, tr)
+            tr = push!(tr, [])[end]
+        end
+        push!(tr, p[i])
+        for _ = 1:cl[i]
+            tr = pop!(st)
+        end
+    end
+    return tr
 end
+
+function print_tree(io::IO, tr::Vector)
+    print(io, "[")
+    for (i, x) in enumerate(tr)
+        print_tree(io, x)
+        i < length(tr) && print(io, " ")
+    end
+    print(io, "]")
+end
+print_tree(io::IO, x::Any) = show(io, x)
+print_tree(x::Any) = print_tree(STDOUT, x)
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
 

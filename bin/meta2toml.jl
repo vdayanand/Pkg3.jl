@@ -471,6 +471,8 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     return p
 end
 
+## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"
+
 #=
 G = full(sparse(
     [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
@@ -489,6 +491,8 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     cl = zeros(Int,n); cl[n] = 1
     lc = collect(1:n)
     uc = collect(1:n)
+    # pass 1: count open and close parens in fracture tree
+    # pass 2: find lower and upper cutters for node pairs
     for j = 1:n-1
         for i = 1:j-1
             G[p[i],p[j]] == G[p[i],p[j+1]] &&
@@ -508,6 +512,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             break
         end
     end
+    # pass 3: remove non-module "dummy" nodes
     let s = Int[]
         for j = 1:n
             for _ = 1:op[j]; push!(s, j); end
@@ -523,6 +528,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             end
         end
     end
+    # pass 4: remove singleton "dummy" nodes
     let s = Int[]
         for j = 1:n
             for _ = 1:op[j]; push!(s, j); end
@@ -537,6 +543,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     end
     op[1] -= 1
     cl[n] -= 1
+    # pass 6: construct tree of strong modules
     t = let st = Any[[]]
         for j = 1:n
             for _ = 1:op[j]

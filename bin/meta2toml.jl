@@ -470,20 +470,28 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
     return p
 end
 
-function lfrac(G::AbstractMatrix, p::Vector{Int}, i::Int, j::Int=i+1)
-    m = min(i, j)
-    for k = 1:m-1
-        G[p[k],p[i]] != G[p[k],p[j]] && return k:m
+function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
+    n = length(p)
+    op, cl = Int[], Int[]
+    for j = 1:n-1
+        for i = 1:j-1
+            G[p[i],p[j]] == G[p[i],p[j+1]] && continue
+            push!(op, i)
+            push!(cl, j)
+            break
+        end
+        j += 1
+        for i = n:-1:j+1
+            G[p[i],p[j-1]] == G[p[i],p[j]] && continue
+            push!(op, j)
+            push!(cl, i)
+            break
+        end
     end
-    return m+1:m
-end
-
-function rfrac(G::AbstractMatrix, p::Vector{Int}, i::Int, j::Int=i+1)
-    m = max(i, j)
-    for k = length(p):-1:m+1
-        G[p[k],p[i]] != G[p[k],p[j]] && return m:k
-    end
-    return m:m-1
+    o, c = zeros(Int, n), zeros(Int, n)
+    for i in op; o[i] += 1; end
+    for i in cl; c[i] += 1; end
+    
 end
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"

@@ -427,7 +427,7 @@ function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
 end
 
 #=
-G = G1 = full(sparse(
+G1 = full(sparse(
     [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
      5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
      8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
@@ -436,8 +436,7 @@ G = G1 = full(sparse(
      11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
     1.0
 ))
-n = Base.LinAlg.checksquare(G)
-p = collect(1:n)
+p1 = collect(1:Base.LinAlg.checksquare(G1))
 =#
 
 #=
@@ -474,15 +473,14 @@ end
 ## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"
 
 #=
-G = G2 = full(sparse(
+G2 = full(sparse(
     [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
      10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
     [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
      12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
     1.0
 ))
-n = Base.LinAlg.checksquare(G)
-p = collect(1:n)
+p2 = collect(1:Base.LinAlg.checksquare(G2))
 =#
 
 function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})

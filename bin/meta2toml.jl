@@ -491,8 +491,8 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     cl = zeros(Int,n); cl[n] = 1
     lc = collect(1:n)
     uc = collect(1:n)
-    # pass 1: count open and close parens in fracture tree
-    # pass 2: find lower and upper cutters for node pairs
+    # count open and close parens in fracture tree
+    # find lower and upper cutters for node pairs
     for j = 1:n-1
         for i = 1:j-1
             G[p[i],p[j]] == G[p[i],p[j+1]] &&
@@ -512,7 +512,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             break
         end
     end
-    # pass 3: remove non-module "dummy" nodes
+    # remove non-module "dummy" nodes
     let s = Int[]
         for j = 1:n
             for _ = 1:op[j]; push!(s, j); end
@@ -528,7 +528,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             end
         end
     end
-    # pass 4: remove singleton "dummy" nodes
+    # remove singleton "dummy" nodes
     let s = Int[]
         for j = 1:n
             for _ = 1:op[j]; push!(s, j); end
@@ -543,7 +543,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     end
     op[1] -= 1
     cl[n] -= 1
-    # pass 5: recover "merged" nodes
+    # recover "merged" nodes
     let i = 1, j = 1
         while j < n
             while j < n && j == lc[j] && uc[j+1] == j+1
@@ -551,14 +551,13 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             end
             # i through j are twins
             if i < j && (op[i] == 0 || cl[j] == 0)
-                @show i, j
                 op[i] += 1
                 cl[j] += 1
             end
             i = j = j + 1
         end
     end
-    # pass 6: construct module tree
+    # construct module tree
     t = let st = Any[[]]
         for j = 1:n
             for _ = 1:op[j]

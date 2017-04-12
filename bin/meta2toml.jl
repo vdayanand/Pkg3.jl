@@ -551,32 +551,22 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
                 push!(t, l) # matching twin stack
                 l = k
             end
-            for c = 1:cl[k]+1
-                i = pop!(t) # matching twin open parens
-                j = pop!(s) # matching node open parens
-                l = k + 1
-                @show i, j, k
-                if i < j
-                    @show i, lc[j-1], uc[j-1], k
-                    if i <= lc[j-1] <= uc[j-1] <= k
-                        println("TWINS")
-                        # i and k are twins
-                        if c <= cl[k]
-                            # more close parens, create new containing node
-                            op[i] += 1
-                            cl[k] += 1
-                        else
-                            # last close parens, continune twin chain
-                            l = i
-                        end
-                    elseif i < j-1
-                        # want to check if i and j-1 are separate nodes but can't quite
-                        # i and j-1 are twins, create node
+            m = cl[k]+1
+            for c = 1:m
+                i = pop!(t)
+                j = pop!(s)
+                l = i
+                i == j && continue
+                if i <= lc[j-1] <= uc[j-1] <= k
+                    if c < m
                         op[i] += 1
-                        cl[j-1] += 1
+                        cl[k] += 1
+                        l = k + 1
                     end
-                else
-                    l = i
+                elseif i < j-1
+                    op[i] += 1
+                    cl[j-1] += 1
+                    l = k + 1
                 end
             end
         end

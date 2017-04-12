@@ -68,7 +68,7 @@ function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
 end
 
 is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
-    all(G[i,k] == G[j,k] for i in S for j in S for k in indices(G,2)\S)
+    all(G[i,k] == G[j,k] && G[k,i] == G[k,j] for i in S for j in S for k in indices(G,2)\S)
 
 overlap(A::Vector, B::Vector) = !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
@@ -132,7 +132,7 @@ G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
 G .= G .⊻ G'
 @assert G == G'
 p = graph_factorizing_permutation(G)
-modules = filter!(S->is_module(G, S), collect(subsets(1:n)))
+modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:n)))
 @assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
 strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
 =#

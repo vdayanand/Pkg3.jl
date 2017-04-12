@@ -231,28 +231,23 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             for c = cl[k]:-1:0
                 i = pop!(t)
                 j = pop!(s)
-                @show i, j, k, c
                 l = i
                 i < j || continue
                 if i <= lc[j-1] < uc[j-1] <= k
-                    println("A: $i <= $(lc[j-1]) < $(uc[j-1]) <= $k")
+                    println("twins: $i $(j-1) $j $k")
                     if c > 0
-                        println("B: $i < $k")
                         op[i] += 1
                         cl[k] += 1
                         l = k + 1
                     end
                 else
-                    println("C: $i $(lc[j-1]) $(uc[j-1]) $k")
                     if i < j-1
-                        println("D: $i < $(j-1)")
                         op[i] += 1
                         cl[j-1] += 1
                         l = k + 1
                     end
                 end
             end
-            @show l
         end
     end
     # remove singleton "dummy" nodes

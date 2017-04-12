@@ -112,7 +112,7 @@ G1 = full(sparse(
     [2, 3, 4, 1, 4, 5, 6, 7, 1, 4, 5, 6, 7, 1, 2, 3, 5, 6, 7, 2,
      3, 4, 6, 7, 2, 3, 4, 5, 8, 9, 10, 11, 2, 3, 4, 5, 8, 9, 10,
      11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
-    1.0
+    1
 ))
 p1 = collect(1:Base.LinAlg.checksquare(G1))
 
@@ -121,7 +121,7 @@ G2 = full(sparse(
      10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
     [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
      12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
-    1.0
+    1
 ))
 p2 = collect(1:Base.LinAlg.checksquare(G2))
 =#
@@ -132,7 +132,7 @@ G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
 G .= G .⊻ G'
 @assert G == G'
 p = graph_factorizing_permutation(G)
-modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:n)))
+modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:length(p))))
 @assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
 strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
 =#
@@ -173,6 +173,24 @@ function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})
         end
     end
     return s[end]
+end
+
+function classify_nodes(G::AbstractMatrix, t::Vector)
+    node(t::Vector) = node(first(t))
+    node(x::Any) = x
+    order(a, b) = a < b ? (a, b) : (b, a)
+    # check consecutive edges
+    prime = false
+    x, y = node(t[1]), node(t[2])
+    edge = order(G[y,x], G[x,y])
+    for i = 2:length(t)-1
+        x, y = node(t[i]), node(t[i+1])
+        if edge != order(G[y,x], G[x,y])
+            prime = true
+            break
+        end
+    end
+    (prime ? () : edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
 end
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
@@ -265,19 +283,24 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     end
     op[1] -= 1
     cl[n] -= 1
-    return make_tree(p, op, cl)
+    # construct the tree
+    t = make_tree(p, op, cl)
+    # classify_nodes!(G, t)
 end
 
-function print_tree(io::IO, tr::Vector, nl::Bool=true)
+function print_tree(io::IO, pair::Pair)
+    show(io, pair[1])
+    print_tree(io, pair[2])
+end
+function print_tree(io::IO, tr::Vector)
     print(io, "[")
     for (i, x) in enumerate(tr)
-        print_tree(io, x, false)
+        print_tree(io, x)
         i < length(tr) && print(io, " ")
     end
     print(io, "]")
-    nl && println(io)
 end
-print_tree(io::IO, x::Any, nl::Bool=true) = show(io, x)
+print_tree(io::IO, x::Any) = show(io, x)
 print_tree(x::Any) = print_tree(STDOUT, x)
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"

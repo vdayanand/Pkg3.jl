@@ -427,7 +427,7 @@ function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
 end
 
 #=
-G = full(sparse(
+G = G1 = full(sparse(
     [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
      5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
      8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
@@ -474,7 +474,7 @@ end
 ## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"
 
 #=
-G = full(sparse(
+G = G2 = full(sparse(
     [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
      10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
     [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
@@ -484,6 +484,22 @@ G = full(sparse(
 n = Base.LinAlg.checksquare(G)
 p = collect(1:n)
 =#
+
+function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})
+    s = Any[[]]
+    for (j, x) = enumerate(v)
+        for _ = 1:op[j]
+            t = []
+            push!(s[end], t)
+            push!(s, t)
+        end
+        push!(s[end], x)
+        for _ = 1:cl[j]
+            pop!(s)
+        end
+    end
+    return s[end]
+end
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
@@ -532,7 +548,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     let s = Int[]
         for j = 1:n
             for _ = 1:op[j]; push!(s, j); end
-            for k = 1:cl[j]
+            for _ = 1:cl[j]
                 i = pop!(s)
                 m = min(op[i],cl[j])-1
                 m < 1 && continue
@@ -543,22 +559,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     end
     op[1] -= 1
     cl[n] -= 1
-    # construct module tree
-    t = let st = Any[[]]
-        for j = 1:n
-            for _ = 1:op[j]
-                t = []
-                push!(st[end], t)
-                push!(st, t)
-            end
-            push!(st[end], p[j])
-            for _ = 1:cl[j]
-                pop!(st)
-            end
-        end
-        st[end]
-    end
-    return t
+    return make_tree(p, op, cl)
 end
 
 function print_tree(io::IO, tr::Vector)

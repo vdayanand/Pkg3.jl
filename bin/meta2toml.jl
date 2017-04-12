@@ -585,12 +585,14 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     let s = Int[]
         for j = 1:n
             for _ = 1:op[j]; push!(s, j); end
+            i′ = 0
             for _ = 1:cl[j]
                 i = pop!(s)
-                m = min(op[i],cl[j])-1
-                m <= 0 && continue
-                op[i] -= m
-                cl[j] -= m
+                if i == i′
+                    op[i] -= 1
+                    cl[j] -= 1
+                end
+                i′ = i
             end
         end
     end

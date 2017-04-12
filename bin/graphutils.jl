@@ -222,7 +222,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     let s = Int[], t = Int[]
         l = 1
         for k = 1:n
-            for c = 1:op[k]+1
+            for _ = 1:op[k]+1
                 push!(s, k) # matching node stack
                 push!(t, l) # matching twin stack
                 l = k

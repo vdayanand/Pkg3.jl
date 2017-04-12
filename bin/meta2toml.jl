@@ -542,6 +542,45 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             end
         end
     end
+    # recover missing parent nodes ("merged")
+    let s = Int[], t = Int[]
+        l = 1
+        for k = 1:n
+            for c = 1:op[k]+1
+                push!(s, k) # matching node stack
+                push!(t, l) # matching twin stack
+                l = k
+            end
+            for c = 1:cl[k]+1
+                i = pop!(t) # matching twin open parens
+                j = pop!(s) # matching node open parens
+                l = k + 1
+                @show i, j, k
+                if i < j
+                    @show i, lc[j-1], uc[j-1], k
+                    if i <= lc[j-1] <= uc[j-1] <= k
+                        println("TWINS")
+                        # i and k are twins
+                        if c <= cl[k]
+                            # more close parens, create new containing node
+                            op[i] += 1
+                            cl[k] += 1
+                        else
+                            # last close parens, continune twin chain
+                            l = i
+                        end
+                    elseif i < j-1
+                        # want to check if i and j-1 are separate nodes but can't quite
+                        # i and j-1 are twins, create node
+                        op[i] += 1
+                        cl[j-1] += 1
+                    end
+                else
+                    l = i
+                end
+            end
+        end
+    end
     # remove singleton "dummy" nodes
     let s = Int[]
         for j = 1:n
@@ -549,7 +588,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             for _ = 1:cl[j]
                 i = pop!(s)
                 m = min(op[i],cl[j])-1
-                m < 1 && continue
+                m <= 0 && continue
                 op[i] -= m
                 cl[j] -= m
             end

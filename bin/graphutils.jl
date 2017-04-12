@@ -219,7 +219,6 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
         end
     end
     # create nodes for consecutive twins
-    print_tree(make_tree(p, op, cl))
     let s = Int[], t = Int[]
         l = 1
         for k = 1:n
@@ -234,7 +233,6 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
                 l = i
                 i < j || continue
                 if i <= lc[j-1] < uc[j-1] <= k
-                    println("twins: $i $(j-1) $j $k")
                     if c > 0
                         op[i] += 1
                         cl[k] += 1
@@ -244,8 +242,8 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
                     if i < j-1
                         op[i] += 1
                         cl[j-1] += 1
-                        l = k + 1
                     end
+                    l = k + 1
                 end
             end
         end

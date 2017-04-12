@@ -6,7 +6,6 @@ X += X'
 G = dropzeros!(1 - X)
 =#
 
-"Neighborhood of a node in the graph G, represented as a matrix."
 N(G, v) = find(G[:, v])
 const \ = setdiff
 
@@ -116,6 +115,15 @@ G1 = full(sparse(
     1.0
 ))
 p1 = collect(1:Base.LinAlg.checksquare(G1))
+
+G2 = full(sparse(
+    [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
+     10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
+    [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
+     12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
+    1.0
+))
+p2 = collect(1:Base.LinAlg.checksquare(G2))
 =#
 
 #=
@@ -150,17 +158,6 @@ function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
 end
 
 ## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"
-
-#=
-G2 = full(sparse(
-    [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
-     10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
-    [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
-     12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
-    1.0
-))
-p2 = collect(1:Base.LinAlg.checksquare(G2))
-=#
 
 function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})
     s = Any[[]]
@@ -221,7 +218,8 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             end
         end
     end
-    # recover missing parent nodes ("merged")
+    # create nodes for consecutive twins
+    print_tree(make_tree(p, op, cl))
     let s = Int[], t = Int[]
         l = 1
         for k = 1:n
@@ -230,24 +228,31 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
                 push!(t, l) # matching twin stack
                 l = k
             end
-            m = cl[k]+1
-            for c = 1:m
+            for c = cl[k]:-1:0
                 i = pop!(t)
                 j = pop!(s)
+                @show i, j, k, c
                 l = i
-                i == j && continue
-                if i <= lc[j-1] <= uc[j-1] <= k
-                    if c < m
+                i < j || continue
+                if i <= lc[j-1] < uc[j-1] <= k
+                    println("A: $i <= $(lc[j-1]) < $(uc[j-1]) <= $k")
+                    if c > 0
+                        println("B: $i < $k")
                         op[i] += 1
                         cl[k] += 1
                         l = k + 1
                     end
-                elseif i < j-1
-                    op[i] += 1
-                    cl[j-1] += 1
-                    l = k + 1
+                else
+                    println("C: $i $(lc[j-1]) $(uc[j-1]) $k")
+                    if i < j-1
+                        println("D: $i < $(j-1)")
+                        op[i] += 1
+                        cl[j-1] += 1
+                        l = k + 1
+                    end
                 end
             end
+            @show l
         end
     end
     # remove singleton "dummy" nodes
@@ -270,15 +275,16 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     return make_tree(p, op, cl)
 end
 
-function print_tree(io::IO, tr::Vector)
+function print_tree(io::IO, tr::Vector, nl::Bool=true)
     print(io, "[")
     for (i, x) in enumerate(tr)
-        print_tree(io, x)
+        print_tree(io, x, false)
         i < length(tr) && print(io, " ")
     end
     print(io, "]")
+    nl && println(io)
 end
-print_tree(io::IO, x::Any) = show(io, x)
+print_tree(io::IO, x::Any, nl::Bool=true) = show(io, x)
 print_tree(x::Any) = print_tree(STDOUT, x)
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"

@@ -543,20 +543,6 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     end
     op[1] -= 1
     cl[n] -= 1
-    # recover "merged" nodes
-    let i = 1, j = 1
-        while j < n
-            while j < n && j == lc[j] && uc[j+1] == j+1
-                j += 1
-            end
-            # i through j are twins
-            if i < j && (op[i] == 0 || cl[j] == 0)
-                op[i] += 1
-                cl[j] += 1
-            end
-            i = j = j + 1
-        end
-    end
     # construct module tree
     t = let st = Any[[]]
         for j = 1:n

@@ -503,8 +503,8 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
-    lc = collect(1:n)
-    uc = collect(1:n)
+    lc = collect(1:n-1)
+    uc = collect(2:n)
     # count open and close parens in fracture tree
     # find lower and upper cutters for node pairs
     for j = 1:n-1
@@ -522,7 +522,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
             G[p[j-1],p[i]] == G[p[j],p[i]] && continue
             op[j] += 1
             cl[i] += 1
-            uc[j] = i
+            uc[j-1] = i
             break
         end
     end
@@ -534,7 +534,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
                 i = pop!(s)
                 if i < j
                     l = minimum(lc[k] for k = i:j-1)
-                    u = maximum(uc[k] for k = i+1:j)
+                    u = maximum(uc[k] for k = i:j-1)
                     i <= l && u <= j && continue
                 end
                 op[i] -= 1

@@ -205,6 +205,23 @@ function classify_nodes(G::AbstractMatrix, t::Vector)
     return (class, edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
 end
 
+function delete_weak_modules!(pair::Pair)
+    i = 1
+    (class, edge), tree = pair
+    while i <= length(tree)
+        if tree[i] isa Pair
+            (c, e), t = delete_weak_modules!(tree[i])
+            if (c, e) == (class, edge)
+                splice!(tree, i, t)
+                i += length(t)
+                continue
+            end
+        end
+        i += 1
+    end
+    return pair
+end
+
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
     op = zeros(Int,n); op[1] = 1
@@ -298,6 +315,7 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     # construct the tree
     t = make_tree(p, op, cl)
     c = classify_nodes(G, t)
+    return delete_weak_modules!(c)
 end
 
 parens = Dict(

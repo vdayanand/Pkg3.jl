@@ -82,8 +82,10 @@ G = rand(n, n)
 T = float(G .< G')
 @assert T + T' + I == ones(T)
 p = tournament_factorizing_permutation(T)
-modules = filter(S->is_module(T, S), collect(subsets(1:n)))
-@assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
+modules = filter!(S->length(S) > 1 && is_module(T, S), collect(subsets(1:length(p))))
+strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
+map(M->findin(p, M), strong)
+@assert all(M->all(x->x == 1, diff(findin(p, M))), modules) # FAILS
 =#
 
 tournament_factorizing_permutation(T::AbstractMatrix) =
@@ -135,8 +137,8 @@ G .= G .⊻ G'
 @assert G == G'
 p = graph_factorizing_permutation(G)
 modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:length(p))))
-@assert all(M->all(x->x == 1, diff(findin(M, p))), modules)
 strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
+@assert all(M->all(x->x == 1, diff(findin(p, M))), strong) # FAILS
 =#
 
 graph_factorizing_permutation(G::AbstractMatrix) =

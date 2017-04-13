@@ -178,19 +178,27 @@ end
 function classify_nodes(G::AbstractMatrix, t::Vector)
     node(t::Vector) = node(first(t))
     node(x::Any) = x
-    order(a, b) = a < b ? (a, b) : (b, a)
     # check consecutive edges
-    prime = false
+    n = length(t)
+    counts = zeros(Int, n)
     x, y = node(t[1]), node(t[2])
-    edge = order(G[y,x], G[x,y])
-    for i = 2:length(t)-1
-        x, y = node(t[i]), node(t[i+1])
-        if edge != order(G[y,x], G[x,y])
-            prime = true
+    edge = (G[y,x], G[x,y])
+    for i = 1:n, j = 1:n
+        i == j && continue
+        x, y = node(t[i]), node(t[j])
+        a, b = G[y,x], G[x,y]
+        if edge == (a, b)
+            counts[i] += 1
+        elseif edge == (b, a)
+            counts[j] += 1
+        else
             break
         end
     end
-    (prime ? () : edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
+    sort!(counts)
+    c = a == b && all(c -> c == n-1, counts) ? '⊙' :
+        all(d -> d == 2, diff(counts)) ? '→' : '⭑'
+    return c => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
 end
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
@@ -285,11 +293,11 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     cl[n] -= 1
     # construct the tree
     t = make_tree(p, op, cl)
-    # classify_nodes!(G, t)
+    # classify_nodes(G, t)
 end
 
 function print_tree(io::IO, pair::Pair)
-    show(io, pair[1])
+    print(io, pair[1])
     print_tree(io, pair[2])
 end
 function print_tree(io::IO, tr::Vector)

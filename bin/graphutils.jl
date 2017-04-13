@@ -79,32 +79,42 @@ overlap(A::Vector, B::Vector) = !isempty(A \ B) && !isempty(A ∩ B) && !isempty
 #=
 n = 5
 G = rand(n, n)
-T = float(G .< G')
-@assert T + T' + I == ones(T)
+T = Int.(G .< G')
+T .-= T'
+@assert -T == T'
 p = tournament_factorizing_permutation(T)
 modules = filter!(S->length(S) > 1 && is_module(T, S), collect(subsets(1:length(p))))
 strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
-map(M->findin(p, M), strong)
-@assert all(M->all(x->x == 1, diff(findin(p, M))), modules) # FAILS
+map(M->findin(p, M), modules)
+@assert all(M->all(x->x == 1, diff(findin(p, M))), strong)
+@assert all(M->all(x->x == 1, diff(findin(p, M))), modules)
 =#
 
-tournament_factorizing_permutation(T::AbstractMatrix) =
-    tfp!(T, collect(1:Base.LinAlg.checksquare(T)))
-
-function tfp!(T::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
-    if hi - lo > 1
+function tournament_factorizing_permutation(T::AbstractMatrix)
+    x → y = T[y,x] < T[x,y]
+    function tfp!(lo::Int, hi::Int)
+        lo + 1 < hi || return
         v = p[lo]
-        i, j = lo + 1, hi
+        i, j = lo+1, hi
         while true
-            while i < j && T[v,p[i]] == 0; i += 1; end;
-            while i < j && T[p[j],v] == 0; j -= 1; end;
+            while i < j && (v → p[j]); j -= 1; end
+            while i < j && (p[i] → v); i += 1; end
             i < j || break
             p[i], p[j] = p[j], p[i]
+            @assert (p[i] → v) && (v → p[j])
         end
-        p[j], p[lo] = v, p[j]
-        tfp!(T, p, lo, j-1)
-        tfp!(T, p, j+1, hi)
+        @assert i == j
+        i -= (v → p[i])
+        @assert i == lo || (p[i] → v)
+        @assert i == hi || (v → p[i+1])
+        p[i], p[lo] = v, p[i]
+        @assert all(p[k] → v for k = lo:i-1)
+        @assert all(v → p[k] for k = i+1:hi)
+        tfp!(lo, i-1)
+        tfp!(i+1, hi)
     end
+    p = collect(1:Base.LinAlg.checksquare(T))
+    tfp!(1, length(p))
     return p
 end
 
@@ -147,20 +157,20 @@ function graph_factorizing_permutation(G::AbstractMatrix)
     function factor!(lo::Int, hi::Int)
         lo + 1 < hi || return
         x = p[lo]
-        i = pivot!(x, lo+1, hi)
+        i = pivot!(x, lo+1, hi, false)
         p[lo], p[i] = p[i], x
         for j = lo:i-1
-            refine!(p[j], i+1, hi, false)
+            pivot!(p[j], i+1, hi, false)
         end
         for j = i+1:hi
-            refine!(p[j], lo, i-1, false)
+            pivot!(p[j], lo, i-1, false)
         end
     end
 
-    function pivot!(x::Int, i::Int, j::Int)
+    function pivot!(x::Int, i::Int, j::Int, b::Bool)
         while true
-            while i < j && G[x,p[j]] != 0; j -= 1; end;
-            while i < j && G[x,p[i]] == 0; i += 1; end;
+            while i < j && b ⊻ (G[x,p[j]] != 0); j -= 1; end;
+            while i < j && b ⊻ (G[x,p[i]] == 0); i += 1; end;
             i < j || break
             p[i], p[j] = p[j], p[i]
         end
@@ -169,11 +179,7 @@ function graph_factorizing_permutation(G::AbstractMatrix)
         return i
     end
 
-    function refine!(y::Int, lo::Int, hi::Int, b::Bool)
-
-    end
-
-    gfp!(1, length(p))
+    factor!(1, length(p))
     return p
 end
 

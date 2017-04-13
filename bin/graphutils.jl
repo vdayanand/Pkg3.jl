@@ -141,23 +141,39 @@ strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
 @assert all(M->all(x->x == 1, diff(findin(p, M))), strong) # FAILS
 =#
 
-graph_factorizing_permutation(G::AbstractMatrix) =
-    gfp!(G, collect(1:Base.LinAlg.checksquare(G)))
+function graph_factorizing_permutation(G::AbstractMatrix)
+    p = collect(1:Base.LinAlg.checksquare(G))
 
-function gfp!(G::AbstractMatrix, p::Vector{Int}, lo::Int=1, hi::Int=length(p))
-    if hi - lo > 1
+    function factor!(lo::Int, hi::Int)
+        lo + 1 < hi || return
         x = p[lo]
-        i, j = lo+1, hi
+        i = pivot!(x, lo+1, hi)
+        p[lo], p[i] = p[i], x
+        for j = lo:i-1
+            refine!(p[j], i+1, hi, false)
+        end
+        for j = i+1:hi
+            refine!(p[j], lo, i-1, false)
+        end
+    end
+
+    function pivot!(x::Int, i::Int, j::Int)
         while true
-            while i < j && G[p[i],x] == 0; i += 1; end;
-            while i < j && G[p[j],x] != 0; j -= 1; end;
+            while i < j && G[x,p[j]] != 0; j -= 1; end;
+            while i < j && G[x,p[i]] == 0; i += 1; end;
             i < j || break
             p[i], p[j] = p[j], p[i]
-            i += 1; j -= 1
         end
-        gfp!(G, p, lo+1, j)
-        gfp!(G, p, j+1, hi)
+        @assert i == j
+        @assert G[x,[i]] == 0
+        return i
     end
+
+    function refine!(y::Int, lo::Int, hi::Int, b::Bool)
+
+    end
+
+    gfp!(1, length(p))
     return p
 end
 

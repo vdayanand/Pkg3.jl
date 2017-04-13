@@ -197,10 +197,12 @@ function classify_nodes(G::AbstractMatrix, t::Vector)
         end
     end
     sort!(counts)
-    c = a == b && all(c -> c == n-1, counts) ? :parallel :
+    class = a == b && all(c -> c == n-1, counts) ? :parallel :
         all(d -> d == 2, diff(counts)) ? :linear : :prime
     edge[1] <= edge[2] || (edge = reverse(edge))
-    return (c, edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
+    # print_tree(t)
+    # println(" ==> ", counts, " ", class, ": ", edge)
+    return (class, edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
 end
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))

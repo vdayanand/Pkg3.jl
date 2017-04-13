@@ -1,5 +1,7 @@
 ## Some graph functions ##
 
+using Iterators
+
 #=
 X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
 X += X'
@@ -178,7 +180,6 @@ end
 function classify_nodes(G::AbstractMatrix, t::Vector)
     node(t::Vector) = node(first(t))
     node(x::Any) = x
-    # check consecutive edges
     n = length(t)
     counts = zeros(Int, n)
     x, y = node(t[1]), node(t[2])
@@ -196,9 +197,10 @@ function classify_nodes(G::AbstractMatrix, t::Vector)
         end
     end
     sort!(counts)
-    c = a == b && all(c -> c == n-1, counts) ? '⊙' :
-        all(d -> d == 2, diff(counts)) ? '→' : '⭑'
-    return c => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
+    c = a == b && all(c -> c == n-1, counts) ? :parallel :
+        all(d -> d == 2, diff(counts)) ? :linear : :prime
+    edge[1] <= edge[2] || (edge = reverse(edge))
+    return (c, edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
 end
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
@@ -293,20 +295,25 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     cl[n] -= 1
     # construct the tree
     t = make_tree(p, op, cl)
-    # classify_nodes(G, t)
+    c = classify_nodes(G, t)
 end
 
+parens = Dict(
+    :parallel => "[]",
+    :linear   => "()",
+    :prime    => "{}"
+)
+
 function print_tree(io::IO, pair::Pair)
-    print(io, pair[1])
-    print_tree(io, pair[2])
+    print_tree(io, pair[2], parens[pair[1][1]]...)
 end
-function print_tree(io::IO, tr::Vector)
-    print(io, "[")
+function print_tree(io::IO, tr::Vector, op::Char='[', cl::Char=']')
+    print(io, op)
     for (i, x) in enumerate(tr)
         print_tree(io, x)
         i < length(tr) && print(io, " ")
     end
-    print(io, "]")
+    print(io, cl)
 end
 print_tree(io::IO, x::Any) = show(io, x)
 print_tree(x::Any) = print_tree(STDOUT, x)

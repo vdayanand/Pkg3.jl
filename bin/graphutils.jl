@@ -204,18 +204,97 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
     return map(first, P)
 end
 
-#=
-n = 6
-G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
-G .= G .⊻ G'
-@assert G == G'
-p = graph_factorizing_permutation(G)
-@assert is_modular_permutation(G, p)
-=#
-
 ## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"
 
-function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})
+isdefined(:StrongModuleTree) ||
+struct StrongModuleTree{T} <: AbstractVector{T}
+    kind::Symbol
+    edge::Tuple
+    nodes::Vector{Union{T,StrongModuleTree{T}}}
+end
+
+Base.size(t::StrongModuleTree) = (length(t),)
+Base.length(t::StrongModuleTree) = length(t.nodes)
+Base.eltype(t::StrongModuleTree) = eltype(t.nodes)
+Base.getindex(t::StrongModuleTree, i::Int) = t.nodes[i]
+
+leaf_count(t::StrongModuleTree) = sum(leaf_count, t.nodes)
+leaf_count(v::Vector) = sum(leaf_count, v)
+leaf_count(x::Any) = 1
+
+first_leaf(t::StrongModuleTree) = first_leaf(first(t.nodes))
+first_leaf(v::Vector) = first_leaf(first(v))
+first_leaf(x::Any) = x
+
+last_leaf(t::StrongModuleTree) = first_leaf(last(t.nodes))
+last_leaf(v::Vector) = last_leaf(last(v))
+last_leaf(x::Any) = x
+
+function Base.summary(t::StrongModuleTree)
+    edge = t.kind == :prime ? "" : "/$(join(t.edge,"-"))"
+    "$(length(t))-node $(t.kind)$edge $(typeof(t))"
+end
+
+function Base.show(io::IO, t::StrongModuleTree)
+    parens = t.kind == :prime ? "{}" : t.kind == :linear ? "[]" : "()"
+    compact = get(io, :compact, false)
+    if compact
+        print(io, parens[1], first_leaf(t), " × ", leaf_count(t), parens[2])
+    else
+        print(io, parens[1])
+        for (i, x) in enumerate(t)
+            print(io, x)
+            i < length(t) && print(io, " ")
+        end
+        print(io, parens[2])
+    end
+end
+
+function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{Int}, cl::Vector{Int}) where T
+
+    function classify_nodes(t::Vector)
+        n = length(t)
+        counts = zeros(Int, n)
+        x, y = first_leaf(t[1]), first_leaf(t[2])
+        edge = (G[y,x], G[x,y])
+        for i = 1:n, j = 1:n
+            i == j && continue
+            x, y = first_leaf(t[i]), first_leaf(t[j])
+            a, b = G[y,x], G[x,y]
+            if edge == (a, b)
+                counts[i] += 1
+            elseif edge == (b, a)
+                counts[j] += 1
+            else
+                break
+            end
+        end
+        sort!(counts)
+        kind = a == b && all(c -> c == n-1, counts) ? :parallel :
+            all(d -> d == 2, diff(counts)) ? :linear : :prime
+        edge[1] <= edge[2] || (edge = reverse(edge))
+        kind == :prime && (edge = ())
+        StrongModuleTree{T}(kind, edge, map(x->x isa Vector ? classify_nodes(x) : x, t))
+    end
+
+    function delete_weak_modules!(t::StrongModuleTree)
+        i = 0
+        while (i += 1) <= length(t)
+            x = t[i]
+            x isa StrongModuleTree || continue
+            delete_weak_modules!(x)
+            t.kind == x.kind && t.edge == x.edge || continue
+            splice!(t.nodes, i, x.nodes)
+            i += length(x)
+        end
+    end
+
+    function sort_nodes!(t::StrongModuleTree)
+        sort!(t.nodes, by=sort_nodes!)
+        return first_leaf(t)
+    end
+    sort_nodes!(x::Any) = x
+
     s = Any[[]]
     for (j, x) = enumerate(v)
         for _ = 1:op[j]
@@ -228,66 +307,13 @@ function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})
             pop!(s)
         end
     end
-    return s[end]
+    t = classify_nodes(s[end])
+    delete_weak_modules!(t)
+    sort_nodes!(t)
+    return t
 end
 
-first_node(t::Vector) = first_node(first(t))
-first_node(p::Pair) = first_node(p[2])
-first_node(x::Any) = x
-
-function classify_nodes(G::AbstractMatrix, t::Vector)
-    n = length(t)
-    counts = zeros(Int, n)
-    x, y = first_node(t[1]), first_node(t[2])
-    edge = (G[y,x], G[x,y])
-    for i = 1:n, j = 1:n
-        i == j && continue
-        x, y = first_node(t[i]), first_node(t[j])
-        a, b = G[y,x], G[x,y]
-        if edge == (a, b)
-            counts[i] += 1
-        elseif edge == (b, a)
-            counts[j] += 1
-        else
-            break
-        end
-    end
-    sort!(counts)
-    class = a == b && all(c -> c == n-1, counts) ? :parallel :
-        all(d -> d == 2, diff(counts)) ? :linear : :prime
-    edge[1] <= edge[2] || (edge = reverse(edge))
-    # print_tree(t)
-    # println(" ==> ", counts, " ", class, ": ", edge)
-    class == :prime && (edge = ())
-    return (class, edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
-end
-
-function delete_weak_modules!(pair::Pair)
-    i = 1
-    (class, edge), tree = pair
-    while i <= length(tree)
-        if tree[i] isa Pair
-            (c, e), t = delete_weak_modules!(tree[i])
-            if (c, e) == (class, edge)
-                splice!(tree, i, t)
-                i += length(t)
-                continue
-            end
-        end
-        i += 1
-    end
-    return pair
-end
-
-function _sort_nodes!(tree::Vector)
-    sort!(tree, by=_sort_nodes!)
-    return first_node(tree)
-end
-_sort_nodes!(p::Pair) = _sort_nodes!(p[2])
-_sort_nodes!(x::Any) = x
-sort_nodes!(x::Any) = (_sort_nodes!(x); x)
-
-function strong_module_tree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
+function StrongModuleTree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
@@ -380,32 +406,8 @@ function strong_module_tree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_
     op[1] -= 1
     cl[n] -= 1
     # construct and normalize the tree
-    t = make_tree(p, op, cl)
-    c = classify_nodes(G, t)
-    delete_weak_modules!(c)
-    sort_nodes!(c)
-    return c
+    return StrongModuleTree(G, p, op, cl)
 end
-
-parens = Dict(
-    :parallel => "[]",
-    :linear   => "()",
-    :prime    => "{}"
-)
-
-function print_tree(io::IO, pair::Pair)
-    print_tree(io, pair[2], parens[pair[1][1]]...)
-end
-function print_tree(io::IO, tr::Vector, op::Char='[', cl::Char=']')
-    print(io, op)
-    for (i, x) in enumerate(tr)
-        print_tree(io, x)
-        i < length(tr) && print(io, " ")
-    end
-    print(io, cl)
-end
-print_tree(io::IO, x::Any) = show(io, x)
-print_tree(x::Any) = print_tree(STDOUT, x)
 
 false &&
 for _ = 1:1000
@@ -416,11 +418,11 @@ for _ = 1:1000
     @assert G == G'
     p = graph_factorizing_permutation(G)
     @assert is_modular_permutation(G, p)
-    T = strong_module_tree(G, p)
+    T = StrongModuleTree(G, p)
     for _ = 1:10
         p′ = graph_factorizing_permutation(G, shuffle(1:n))
         @assert is_modular_permutation(G, p′)
-        T′ = strong_module_tree(G, p′)
+        T′ = StrongModuleTree(G, p′)
         @assert T == T′
     end
 end

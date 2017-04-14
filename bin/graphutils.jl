@@ -250,6 +250,9 @@ function Base.show(io::IO, t::StrongModuleTree)
     end
 end
 
+Base.getindex(v::Vector{T}, t::StrongModuleTree) where {T} =
+    StrongModuleTree{T}(t.kind, t.edge, map(x->v[x], t.nodes))
+
 function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{Int}, cl::Vector{Int}) where T
 
     function classify_nodes(t::Vector)

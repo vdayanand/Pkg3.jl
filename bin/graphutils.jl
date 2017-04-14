@@ -94,45 +94,67 @@ end
 is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
     all(G[i,k] == G[j,k] && G[k,i] == G[k,j] for i in S for j in S for k in indices(G,2)\S)
 
+all_modules(G) = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:size(G,2))))
+
 overlap(A::Vector, B::Vector) = !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
-function is_modular_permutation(G, p)
-    modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:length(p))))
-    strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
-    diffs = map(M->diff(findin(p, M)), strong)
+function strong_modules(G)
+    modules = all_modules(G)
+    return filter(A -> all(B -> !overlap(A, B), modules), modules)
+end
+
+function is_modular_permutation(G::AbstractMatrix, p::Vector{Int}; modules=strong_modules(G))
+    diffs = map(M->diff(findin(p, M)), modules)
+    maximum(maximum, diffs) == 1
+end
+
+findin_partition(P, S) = sort!(map(x->findfirst(X->x in X, P), S))
+
+function is_modular_partition(G::AbstractMatrix, P::Vector{Vector{Int}}; modules=strong_modules(G))
+    sort!(vcat(P...)) == collect(1:size(G,2)) || error("not a partition")
+    diffs = map(M->diff(findin_partition(P, M)), modules)
     maximum(maximum, diffs) == 1
 end
 
 ## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
 
 function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:Base.LinAlg.checksquare(G)))
-    debug = true
+    strong = strong_modules(G)
+    debug = false
 
     P = [V]
-    center = 0
-    pivots = []
-    modules = []
-    first_pivot = Dict()
+    center::Int = 0
+    pivots::Vector{Vector{Int}} = []
+    modules::Vector{Vector{Int}} = []
+    first_pivot = Dict{Vector{Int},Int}()
 
     N_adj(x, X=V) = [y for y in X if y != x && G[x,y] != 0]
     N_non(x, X=V) = [y for y in X if y != x && G[x,y] == 0]
 
     smaller_larger(A, B) = length(A) <= length(B) ? (A, B) : (B, A)
 
-    function refine!(P, S, E)
-        debug && println("refine!($P, $S, $E)")
-        between = 0
+    function refine!(P, S, x)
+        @show S center x
+        debug && println("refine!($P, $S, $x)")
+        between = false
+        @show between
         i = 0
         while (i += 1) <= length(P)
             X = P[i]
-            if (center in X) || (X === E)
-                between += 1
+            if center in X || x in X
+                between = !between
+                @show between
                 continue
             end
-            X, Xₐ = X \ S, X ∩ S
-            (isempty(X) || isempty(Xₐ)) && continue
+            Xₐ = X ∩ S
+            isempty(Xₐ) && continue
+            X = X \ Xₐ
+            isempty(X) && continue
+            @show P X Xₐ
             P[i] = X
-            insert!(P, i + (between != 1), Xₐ)
+            insert!(P, i + !between, Xₐ)
+            @show P
+            @assert is_modular_partition(G, P, modules=strong)
             add_pivot(X, Xₐ)
             i += 1
         end
@@ -159,8 +181,8 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
             while !isempty(pivots)
                 E = pop!(pivots)
                 for x in E
-                    S = N_adj(x) \ E # pivot_set(x, E)
-                    refine!(P, S, E)
+                    S = N_adj(x) \ E
+                    refine!(P, S, x)
                 end
             end
         end
@@ -175,6 +197,7 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
                 x = get(first_pivot, X, first(X))
                 N, A = N_non(x, X), N_adj(x, X)
                 splice!(P, i, filter(!isempty, [N, [x], A]))
+                @assert is_modular_partition(G, P, modules=strong)
                 S, L = smaller_larger(N, A)
                 center = x
                 push!(pivots, S)

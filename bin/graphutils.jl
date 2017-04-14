@@ -8,6 +8,28 @@ X += X'
 G = dropzeros!(1 - X)
 =#
 
+#=
+G1 = full(sparse(
+    [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
+     5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
+     8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
+    [2, 3, 4, 1, 4, 5, 6, 7, 1, 4, 5, 6, 7, 1, 2, 3, 5, 6, 7, 2,
+     3, 4, 6, 7, 2, 3, 4, 5, 8, 9, 10, 11, 2, 3, 4, 5, 8, 9, 10,
+     11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
+    1
+))
+p1 = collect(1:Base.LinAlg.checksquare(G1))
+
+G2 = full(sparse(
+    [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
+     10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
+    [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
+     12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
+    1
+))
+p2 = collect(1:Base.LinAlg.checksquare(G2))
+=#
+
 const \ = setdiff
 
 function BronKerboschTomita(emit, G, R, P, X)
@@ -74,88 +96,18 @@ is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
 
 overlap(A::Vector, B::Vector) = !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
-## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
-
-#=
-n = 5
-G = rand(n, n)
-T = Int.(G .< G')
-T .-= T'
-@assert -T == T'
-p = tournament_factorizing_permutation(T)
-modules = filter!(S->length(S) > 1 && is_module(T, S), collect(subsets(1:length(p))))
-strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
-map(M->findin(p, M), modules)
-@assert all(M->all(x->x == 1, diff(findin(p, M))), strong)
-@assert all(M->all(x->x == 1, diff(findin(p, M))), modules)
-=#
-
-function tournament_factorizing_permutation(T::AbstractMatrix)
-    x → y = T[y,x] < T[x,y]
-    function tfp!(lo::Int, hi::Int)
-        lo + 1 < hi || return
-        v = p[lo]
-        i, j = lo+1, hi
-        while true
-            while i < j && (v → p[j]); j -= 1; end
-            while i < j && (p[i] → v); i += 1; end
-            i < j || break
-            p[i], p[j] = p[j], p[i]
-            @assert (p[i] → v) && (v → p[j])
-        end
-        @assert i == j
-        i -= (v → p[i])
-        @assert i == lo || (p[i] → v)
-        @assert i == hi || (v → p[i+1])
-        p[i], p[lo] = v, p[i]
-        @assert all(p[k] → v for k = lo:i-1)
-        @assert all(v → p[k] for k = i+1:hi)
-        tfp!(lo, i-1)
-        tfp!(i+1, hi)
-    end
-    p = collect(1:Base.LinAlg.checksquare(T))
-    tfp!(1, length(p))
-    return p
+function is_modular_permutation(G, p)
+    modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:length(p))))
+    strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
+    diffs = map(M->diff(findin(p, M)), strong)
+    maximum(maximum, diffs) == 1
 end
-
-#=
-G1 = full(sparse(
-    [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
-     5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
-     8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
-    [2, 3, 4, 1, 4, 5, 6, 7, 1, 4, 5, 6, 7, 1, 2, 3, 5, 6, 7, 2,
-     3, 4, 6, 7, 2, 3, 4, 5, 8, 9, 10, 11, 2, 3, 4, 5, 8, 9, 10,
-     11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
-    1
-))
-p1 = collect(1:Base.LinAlg.checksquare(G1))
-
-G2 = full(sparse(
-    [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
-     10, 10, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14],
-    [3, 4, 5, 1, 2, 4, 5, 2, 4, 2, 7, 8, 9, 10, 8, 9, 10, 9, 10, 11,
-     12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
-    1
-))
-p2 = collect(1:Base.LinAlg.checksquare(G2))
-=#
-
-#=
-n = 6
-G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
-G .= G .⊻ G'
-@assert G == G'
-p = graph_factorizing_permutation(G)
-modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:length(p))))
-strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
-@assert all(M->all(x->x == 1, diff(findin(p, M))), strong)
-=#
 
 ## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
 
-function graph_factorizing_permutation(G::AbstractMatrix)
+function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:Base.LinAlg.checksquare(G)))
+    debug = true
 
-    V = collect(1:Base.LinAlg.checksquare(G))
     P = [V]
     center = 0
     pivots = []
@@ -168,7 +120,7 @@ function graph_factorizing_permutation(G::AbstractMatrix)
     smaller_larger(A, B) = length(A) <= length(B) ? (A, B) : (B, A)
 
     function refine!(P, S, E)
-        # println("refine!($P, $S, $E)")
+        debug && println("refine!($P, $S, $E)")
         between = 0
         i = 0
         while (i += 1) <= length(P)
@@ -187,7 +139,7 @@ function graph_factorizing_permutation(G::AbstractMatrix)
     end
 
     function add_pivot(X, Xₐ)
-        # println("add_pivot($X, $Xₐ)")
+        debug && println("add_pivot($X, $Xₐ)")
         if X in pivots
             push!(pivots, Xₐ)
         else
@@ -215,7 +167,7 @@ function graph_factorizing_permutation(G::AbstractMatrix)
     end
 
     function init_partition!(P)
-        # println("init_partition!($P)")
+        debug && println("init_partition!($P)")
         maximum(length, P) <= 1 && return false
         if isempty(modules)
             for (i, X) in enumerate(P)
@@ -241,6 +193,15 @@ function graph_factorizing_permutation(G::AbstractMatrix)
     partition_refinement!(P)
     return map(first, P)
 end
+
+#=
+n = 6
+G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
+G .= G .⊻ G'
+@assert G == G'
+p = graph_factorizing_permutation(G)
+@assert is_modular_permutation(G, p)
+=#
 
 ## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"
 

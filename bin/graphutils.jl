@@ -152,35 +152,73 @@ strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
 =#
 
 function graph_factorizing_permutation(G::AbstractMatrix)
-    p = collect(1:Base.LinAlg.checksquare(G))
+    local pivots, modules, center
 
-    function factor!(lo::Int, hi::Int)
-        lo + 1 < hi || return
-        x = p[lo]
-        i = pivot!(x, lo+1, hi, false)
-        p[lo], p[i] = p[i], x
-        for j = lo:i-1
-            pivot!(p[j], i+1, hi, false)
-        end
-        for j = i+1:hi
-            pivot!(p[j], lo, i-1, false)
+    N_adj(x, X=V) = [y for y in X if y != x && G[x,y] != 0]
+    N_non(x, X=V) = [y for y in X if y != x && G[x,y] == 0]
+
+    function refine!(P, S, p)
+        for (i, X) in enumerate(P)
+            Xₐ = X ∩ S
+            isempty(Xₐ) && continue
+            setdiff!(X, S)
+            i += insert_right(X, Xₐ, p)
+            insert!(P, i, Xₐ)
+            add_pivot(X, Xₐ)
         end
     end
 
-    function pivot!(x::Int, i::Int, j::Int, b::Bool)
-        while true
-            while i < j && b ⊻ (G[x,p[j]] != 0); j -= 1; end;
-            while i < j && b ⊻ (G[x,p[i]] == 0); i += 1; end;
-            i < j || break
-            p[i], p[j] = p[j], p[i]
-        end
-        @assert i == j
-        @assert G[x,[i]] == 0
-        return i
+    function insert_right(X, Xₐ, p)
+
     end
 
-    factor!(1, length(p))
-    return p
+    function add_pivot(X, Xₐ)
+        
+    end
+
+    function partition_refinement!(P)
+        pivots = []
+        while init_partition(P)
+            while !isempty(pivots)
+                ℇ = pop!(pivots)
+                for x in ℇ
+                    p = (x, ℇ)
+                    S = N_adj(x) \ ℇ
+                    refine!(P, S, p)
+                end
+            end
+        end
+    end
+
+    function init_partition(P)
+        maximum(length, P) <= 1 && return false
+        first_pivot = Dict()
+        if isempty(modules)
+            for (i, X) in enumerate(P)
+                length(X) > 1 || continue
+                x = get(first_pivot, X, first(X))
+                N, A = N_non(x, X), N_adj(x, X)
+                insert!(P, i, N)
+                insert!(P, i, [x])
+                insert!(P, i, A)
+                S, L = length(N) <= length(A) ? (N, A) : (A, N)
+                push!(pivots, S)
+                push!(modules, L)
+                center = x
+                break
+            end
+        else
+            X = shift!(modules)
+            x = first(X)
+            push!(pivots, [x])
+            first_pivot[X] = x
+        end
+    end
+
+    V = collect(1:Base.LinAlg.checksquare(G))
+    P = [V]
+    partition_refinement!(P)
+    return map(first, P)
 end
 
 ## Capelle, Habib & de Montgolfier 2002: "Graph decompositions and factorizing permutations"

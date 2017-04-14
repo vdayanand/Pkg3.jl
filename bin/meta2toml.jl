@@ -286,7 +286,7 @@ function requires_map()
 end
 
 function incompatibility_matrix()
-    G = spzeros(n, n)
+    G = spzeros(Int, n, n)
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
@@ -312,9 +312,9 @@ end
 const pkg_map = package_map()
 const req_map = requires_map()
 const G = incompatibility_matrix()
-const P = sparse(pkg_map, 1:n, 1.0, m, n)
+const P = sparse(pkg_map, 1:n, 1, m, n)
 const R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
-    sparse(first.(p), last.(p), 1.0, m, n)
+    sparse(first.(p), last.(p), 1, m, n)
 end
 const D = iterate_dependencies(G, P, R)
 const Dp = min.(1, D*P')

@@ -8,10 +8,10 @@ X += X'
 G = dropzeros!(1 - X)
 =#
 
-N(G, v) = find(G[:, v])
 const \ = setdiff
 
 function BronKerboschTomita(emit, G, R, P, X)
+    N(G, v) = find(G[:, v])
     let available = unique(pkg_map[v] for V in (R, P) for v in V)
         # if any in R are unsatisfiable, return
         for v in R, r in req_map[v]
@@ -148,63 +148,85 @@ G .= G .⊻ G'
 p = graph_factorizing_permutation(G)
 modules = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:length(p))))
 strong = filter(A -> all(B -> !overlap(A, B), modules), modules)
-@assert all(M->all(x->x == 1, diff(findin(p, M))), strong) # FAILS
+@assert all(M->all(x->x == 1, diff(findin(p, M))), strong)
 =#
 
+## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
+
 function graph_factorizing_permutation(G::AbstractMatrix)
-    local pivots, modules, center
+
+    V = collect(1:Base.LinAlg.checksquare(G))
+    P = [V]
+    center = 0
+    pivots = []
+    modules = []
+    first_pivot = Dict()
 
     N_adj(x, X=V) = [y for y in X if y != x && G[x,y] != 0]
     N_non(x, X=V) = [y for y in X if y != x && G[x,y] == 0]
 
-    function refine!(P, S, p)
-        for (i, X) in enumerate(P)
-            Xₐ = X ∩ S
-            isempty(Xₐ) && continue
-            setdiff!(X, S)
-            i += insert_right(X, Xₐ, p)
-            insert!(P, i, Xₐ)
+    smaller_larger(A, B) = length(A) <= length(B) ? (A, B) : (B, A)
+
+    function refine!(P, S, E)
+        # println("refine!($P, $S, $E)")
+        between = 0
+        i = 0
+        while (i += 1) <= length(P)
+            X = P[i]
+            if (center in X) || (X === E)
+                between += 1
+                continue
+            end
+            X, Xₐ = X \ S, X ∩ S
+            (isempty(X) || isempty(Xₐ)) && continue
+            P[i] = X
+            insert!(P, i + (between != 1), Xₐ)
             add_pivot(X, Xₐ)
+            i += 1
         end
     end
 
-    function insert_right(X, Xₐ, p)
-
-    end
-
     function add_pivot(X, Xₐ)
-        
+        # println("add_pivot($X, $Xₐ)")
+        if X in pivots
+            push!(pivots, Xₐ)
+        else
+            S, L = smaller_larger(X, Xₐ)
+            push!(pivots, S)
+            i = findfirst(modules, X)
+            if 0 < i
+                modules[i] = L
+            else
+                push!(modules, L)
+            end
+        end
     end
 
     function partition_refinement!(P)
-        pivots = []
-        while init_partition(P)
+        while init_partition!(P)
             while !isempty(pivots)
-                ℇ = pop!(pivots)
-                for x in ℇ
-                    p = (x, ℇ)
-                    S = N_adj(x) \ ℇ
-                    refine!(P, S, p)
+                E = pop!(pivots)
+                for x in E
+                    S = N_adj(x) \ E # pivot_set(x, E)
+                    refine!(P, S, E)
                 end
             end
         end
     end
 
-    function init_partition(P)
+    function init_partition!(P)
+        # println("init_partition!($P)")
         maximum(length, P) <= 1 && return false
-        first_pivot = Dict()
         if isempty(modules)
             for (i, X) in enumerate(P)
                 length(X) > 1 || continue
                 x = get(first_pivot, X, first(X))
                 N, A = N_non(x, X), N_adj(x, X)
-                insert!(P, i, N)
-                insert!(P, i, [x])
-                insert!(P, i, A)
-                S, L = length(N) <= length(A) ? (N, A) : (A, N)
+                splice!(P, i, filter(!isempty, [N, [x], A]))
+                S, L = smaller_larger(N, A)
+                center = x
                 push!(pivots, S)
                 push!(modules, L)
-                center = x
                 break
             end
         else
@@ -213,10 +235,9 @@ function graph_factorizing_permutation(G::AbstractMatrix)
             push!(pivots, [x])
             first_pivot[X] = x
         end
+        return true
     end
 
-    V = collect(1:Base.LinAlg.checksquare(G))
-    P = [V]
     partition_refinement!(P)
     return map(first, P)
 end

@@ -119,8 +119,6 @@ end
 ## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
 
 function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:Base.LinAlg.checksquare(G)))
-    strong = strong_modules(G)
-    debug = false
 
     P = [V]
     center::Int = 0
@@ -134,26 +132,19 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
     smaller_larger(A, B) = length(A) <= length(B) ? (A, B) : (B, A)
 
     function refine!(P, S, x)
-        @show S center x
-        debug && println("refine!($P, $S, $x)")
-        between = false
-        @show between
-        i = 0
+        i, between = 0, false
         while (i += 1) <= length(P)
             X = P[i]
             if center in X || x in X
                 between = !between
-                @show between
                 continue
             end
             Xₐ = X ∩ S
             isempty(Xₐ) && continue
             X = X \ Xₐ
             isempty(X) && continue
-            @show P X Xₐ
             P[i] = X
             insert!(P, i + !between, Xₐ)
-            @show P
             @assert is_modular_partition(G, P, modules=strong)
             add_pivot(X, Xₐ)
             i += 1

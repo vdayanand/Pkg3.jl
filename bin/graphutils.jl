@@ -345,20 +345,22 @@ function strong_module_tree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_
             for c = cl[k]:-1:0
                 i = pop!(t)
                 j = pop!(s)
-                l = i
+                l = i # continue twin chain by default
                 i < j || continue
                 if i <= lc[j-1] < uc[j-1] <= k
+                    # this node and prev are twins
                     if c > 0
+                        # not last parens ∴ last twin
                         op[i] += 1
                         cl[k] += 1
                         l = k + 1
                     end
-                else
+                else # this node and prev not twins
                     if i < j-1
                         op[i] += 1
                         cl[j-1] += 1
                     end
-                    l = k + 1
+                    l = j # this node starts new chain
                 end
             end
         end
@@ -408,21 +410,20 @@ end
 print_tree(io::IO, x::Any) = show(io, x)
 print_tree(x::Any) = print_tree(STDOUT, x)
 
-#=
+false &&
 for _ = 1:1000
-    global n, G, p, t, p′, t′
+    global n, G, p, T, p′, T′
     n = rand(3:10)
     G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
     G .= G .⊻ G'
     @assert G == G'
     p = graph_factorizing_permutation(G)
     @assert is_modular_permutation(G, p)
-    t = strong_module_tree(G, p)
-    for _ = 1:100
+    T = strong_module_tree(G, p)
+    for _ = 1:10
         p′ = graph_factorizing_permutation(G, shuffle(1:n))
         @assert is_modular_permutation(G, p′)
-        t′ = strong_module_tree(G, p′)
-        @assert t == t′
+        T′ = strong_module_tree(G, p′)
+        @assert T == T′
     end
 end
-=#

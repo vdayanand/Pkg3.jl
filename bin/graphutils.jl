@@ -119,6 +119,7 @@ end
 ## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
 
 function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:Base.LinAlg.checksquare(G)))
+    strong = strong_modules(G)
 
     P = [V]
     center::Int = 0
@@ -152,7 +153,6 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
     end
 
     function add_pivot(X, Xₐ)
-        debug && println("add_pivot($X, $Xₐ)")
         if X in pivots
             push!(pivots, Xₐ)
         else
@@ -180,7 +180,6 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
     end
 
     function init_partition!(P)
-        debug && println("init_partition!($P)")
         maximum(length, P) <= 1 && return false
         if isempty(modules)
             for (i, X) in enumerate(P)
@@ -290,7 +289,7 @@ end
 sort_nodes!(p::Pair) = sort_nodes!(p[2])
 sort_nodes!(x::Any) = x
 
-function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
+function strong_module_tree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
@@ -407,3 +406,22 @@ function print_tree(io::IO, tr::Vector, op::Char='[', cl::Char=']')
 end
 print_tree(io::IO, x::Any) = show(io, x)
 print_tree(x::Any) = print_tree(STDOUT, x)
+
+#=
+for _ = 1:1000
+    global n, G, p, t, p′, t′
+    n = rand(3:10)
+    G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
+    G .= G .⊻ G'
+    @assert G == G'
+    p = graph_factorizing_permutation(G)
+    @assert is_modular_permutation(G, p)
+    t = strong_module_tree(G, p)
+    for _ = 1:100
+        p′ = graph_factorizing_permutation(G, shuffle(1:n))
+        @assert is_modular_permutation(G, p′)
+        t′ = strong_module_tree(G, p′)
+        @assert t == t′
+    end
+end
+=#

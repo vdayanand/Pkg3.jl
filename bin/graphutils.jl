@@ -282,12 +282,13 @@ function delete_weak_modules!(pair::Pair)
     return pair
 end
 
-function sort_nodes!(tree::Vector)
-    sort!(tree, by=sort_nodes!)
+function _sort_nodes!(tree::Vector)
+    sort!(tree, by=_sort_nodes!)
     return first_node(tree)
 end
-sort_nodes!(p::Pair) = sort_nodes!(p[2])
-sort_nodes!(x::Any) = x
+_sort_nodes!(p::Pair) = _sort_nodes!(p[2])
+_sort_nodes!(x::Any) = x
+sort_nodes!(x::Any) = (_sort_nodes!(x); x)
 
 function strong_module_tree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)

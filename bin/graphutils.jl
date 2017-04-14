@@ -260,16 +260,18 @@ function make_tree(v::AbstractVector{Int}, op::Vector{Int}, cl::Vector{Int})
     return s[end]
 end
 
+first_node(t::Vector) = first_node(first(t))
+first_node(p::Pair) = first_node(p[2])
+first_node(x::Any) = x
+
 function classify_nodes(G::AbstractMatrix, t::Vector)
-    node(t::Vector) = node(first(t))
-    node(x::Any) = x
     n = length(t)
     counts = zeros(Int, n)
-    x, y = node(t[1]), node(t[2])
+    x, y = first_node(t[1]), first_node(t[2])
     edge = (G[y,x], G[x,y])
     for i = 1:n, j = 1:n
         i == j && continue
-        x, y = node(t[i]), node(t[j])
+        x, y = first_node(t[i]), first_node(t[j])
         a, b = G[y,x], G[x,y]
         if edge == (a, b)
             counts[i] += 1
@@ -285,6 +287,7 @@ function classify_nodes(G::AbstractMatrix, t::Vector)
     edge[1] <= edge[2] || (edge = reverse(edge))
     # print_tree(t)
     # println(" ==> ", counts, " ", class, ": ", edge)
+    class == :prime && (edge = ())
     return (class, edge) => map(x->x isa Vector ? classify_nodes(G, x) : x, t)
 end
 
@@ -304,6 +307,13 @@ function delete_weak_modules!(pair::Pair)
     end
     return pair
 end
+
+function sort_nodes!(tree::Vector)
+    sort!(tree, by=sort_nodes!)
+    return first_node(tree)
+end
+sort_nodes!(p::Pair) = sort_nodes!(p[2])
+sort_nodes!(x::Any) = x
 
 function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
     n = length(p)
@@ -395,10 +405,12 @@ function ftree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G
     end
     op[1] -= 1
     cl[n] -= 1
-    # construct the tree
+    # construct and normalize the tree
     t = make_tree(p, op, cl)
     c = classify_nodes(G, t)
-    return delete_weak_modules!(c)
+    delete_weak_modules!(c)
+    sort_nodes!(c)
+    return c
 end
 
 parens = Dict(

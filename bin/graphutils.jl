@@ -33,11 +33,13 @@ p2 = collect(1:Base.LinAlg.checksquare(G2))
 const \ = setdiff
 
 function BronKerboschTomita(emit, G, R, P, X)
+
     N(G, v) = find(G[:, v])
+
     let available = unique(pkg_map[v] for V in (R, P) for v in V)
         # if any in R are unsatisfiable, return
         for v in R, r in req_map[v]
-            r in available || return
+            r in available || return true
         end
         # scrub unsatisfiable versions from P & X
         for V in (P, X)
@@ -47,8 +49,10 @@ function BronKerboschTomita(emit, G, R, P, X)
         end
     end
     @show length(R), length(P), length(X)
+
     # recursion base case
-    isempty(P) && isempty(X) && (emit(R); return)
+    isempty(P) && isempty(X) && return emit(R) != :break
+
     # pivot: u in P ∪ X minimizing P ∩ N(G, u)
     u, m = 0, typemax(Int)
     for V in (P, X), v in V
@@ -56,16 +60,18 @@ function BronKerboschTomita(emit, G, R, P, X)
         n < m && ((u, m) = (v, n))
     end
     @assert u != 0
+
     # recursion
     for v in P ∩ N(G, u)
         Nv = N(G, v)
-        BronKerboschTomita(emit, G, [R; v], P \ Nv, X \ Nv)
+        BronKerboschTomita(emit, G, [R; v], P \ Nv, X \ Nv) || return false
         filter!(x -> x != v, P)
         push!(X, v)
     end
+    return true
 end
 
-function maximal_indepedent_sets(io::IO, G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2)))
+function maximal_indepedent_sets(io::IO, G::AbstractMatrix, inds::Vector{Int}=collect(1:size(G,2)))
     G = min.(1, G + I) # make each node its own neighbor
     M = Vector{Vector{Int}}()
     BronKerboschTomita(G, Int[], copy(inds), Int[]) do R
@@ -76,10 +82,34 @@ function maximal_indepedent_sets(io::IO, G::AbstractMatrix, inds::Vector{Int} = 
     end
     return sort!(M, lt=lexless)
 end
-maximal_indepedent_sets(path::String, G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2))) =
+maximal_indepedent_sets(path::String, G::AbstractMatrix, inds::Vector{Int}=collect(1:size(G,2))) =
     open(io->maximal_indepedent_sets(io, G, inds), path, "w")
 maximal_indepedent_sets(G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2))) =
     maximal_indepedent_sets(STDOUT, G, inds)
+
+function find_independent_set(G::AbstractMatrix, R::Vector{Int}, inds::Vector{Int}=collect(1:size(G,2)))
+    found = Int[]
+    G = min.(1, G + I) # make each node its own neighbor
+    BronKerboschTomita(G, R, inds \ R, Int[]) do R
+        found = sort!(R)
+        :break
+    end
+    return found
+end
+
+function satisfiable_pairs(G::AbstractMatrix, inds::Vector{Int}=collect(1:size(G,2)))
+    G = min.(1, G + I) # make each node its own neighbor
+    S = zeros(Int, length(inds), length(inds))
+    for (i, x) in enumerate(inds), (j, y) in enumerate(inds)
+        G[x,y] != 0 && continue
+        S[i,j] != 0 && continue
+        v = find_independent_set(G, [x, y], inds)
+        @assert iszero(G[v,v] - I)
+        w = findin(inds, v)
+        S[w,w] = 1
+    end
+    return S
+end
 
 function is_satisfied(V::Vector{Int})
     provided = unique(pkg_map[v] for v in V)

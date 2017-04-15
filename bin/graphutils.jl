@@ -303,7 +303,7 @@ function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{In
             end
         end
         sort!(counts)
-        kind = a == b && all(c -> c == n-1, counts) ? :parallel :
+        kind = a == b && all(c -> c == n-1, counts) ? :complete :
             all(d -> d == 2, diff(counts)) ? :linear : :prime
         edge[1] <= edge[2] || (edge = reverse(edge))
         kind == :prime && (edge = ())

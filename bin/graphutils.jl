@@ -146,51 +146,6 @@ function is_modular_partition(G::AbstractMatrix, P::Vector{Vector{Int}}; modules
     maximum(maximum, diffs) == 1
 end
 
-## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
-
-function tournament_factorizing_permutation(T::AbstractMatrix)
-    x → y = T[y,x] < T[x,y]
-
-    function tfp!(lo::Int, hi::Int)
-        lo + 1 < hi || return
-        v = p[lo]
-        @assert all(v < p[k] for k = lo+1:hi)
-        i, j = lo+1, hi
-        while true
-            while i < j && (p[i] → v); i += 1; end
-            while i < j && (v → p[j]); j -= 1; end
-            i < j || break
-            p[i], p[j] = p[j], p[i]
-            @assert (p[i] → v) && (v → p[j])
-        end
-        @assert i == j
-        i -= (v → p[j])
-        @assert i <= lo || (p[i] → v)
-        @assert i >= hi || (v → p[i+1])
-        p[i], p[lo] = v, p[i]
-        @assert all(p[k] → v for k = lo:i-1)
-        @assert all(v → p[k] for k = i+1:hi)
-        tfp!(lo, i-1)
-        tfp!(i+1, hi)
-    end
-
-    p = collect(1:Base.LinAlg.checksquare(T))
-    tfp!(1, length(p))
-    return p
-end
-
-false &&
-for _ = 1:1000
-    global n, T, p
-    n = rand(3:10)
-    T = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
-    T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
-    @assert T + T' + I == ones(n,n)
-    p = tournament_factorizing_permutation(T)
-    modules = all_modules(T)
-    @assert is_modular_permutation(G, p, modules=modules)
-end
-
 ## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
 
 function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:Base.LinAlg.checksquare(G)))

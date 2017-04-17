@@ -308,22 +308,25 @@ last_leaf(t::StrongModuleTree) = first_leaf(last(t.nodes))
 last_leaf(v::Vector) = last_leaf(last(v))
 last_leaf(x::Any) = x
 
-function kind_summary(t::StrongModuleTree)
+edge_string(t::StrongModuleTree, post::String="") =
     edge = t.kind == :prime    ? "" :
-           t.kind == :complete ? "$(t.edge[1])-" :
-                                 "$(join(t.edge,"-"))-"
-    return "$edge$(t.kind)"
-end
+           t.kind == :complete ? "$(t.edge[1])$post" :
+                                 "$(join(t.edge,"/"))$post"
 
 Base.summary(t::StrongModuleTree) =
-    "$(length(t))-node $(kind_summary(t)) $(typeof(t))"
+    "$(length(t))-node $(edge_string(t,"-"))$(t.kind) $(typeof(t))"
 
 function Base.show(io::IO, t::StrongModuleTree)
     if get(io, :compact, false)
-        print(io, kind_summary(t), " ", node_count(t), "-node, ", leaf_count(t), "-leaf module: ", first_leaf(t))
+        print(io,
+            edge_string(t,"-"), t.kind, " ",
+            node_count(t), "-node (",
+            leaf_count(t), "-leaf) module: ",
+            first_leaf(t)
+        )
     else
         parens = t.kind == :prime ? "{}" : t.kind == :linear ? "[]" : "()"
-        print(io, parens[1])
+        print(io, edge_string(t), parens[1])
         for (i, x) in enumerate(t)
             print(io, x)
             i < length(t) && print(io, " ")
@@ -504,6 +507,7 @@ for _ = 1:1000
     p = graph_factorizing_permutation(G)
     @assert is_modular_permutation(G, p)
     T = StrongModuleTree(G, p)
+    # TODO: check that all strong modules are nodes
     for _ = 1:10
         p′ = graph_factorizing_permutation(G, shuffle(1:n))
         @assert is_modular_permutation(G, p′)

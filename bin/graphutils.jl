@@ -471,3 +471,36 @@ for _ = 1:1000
         @assert T == T′
     end
 end
+
+## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
+
+#=
+Brute force all common intervals:
+[(x,y) for x=1:n-1 for y=x+1:n for l=1:n-1 for u=l+1:n if sort!(p1[x:y]) == sort!(p2[l:u])]
+=#
+
+function all_common_intervals(emit::Function, p::Vector{Int})
+    for x = 1:length(p)-1
+        l = u = p[x]
+        for y = x+1:length(p)
+            v = p[y]
+            l, u = min(v, l), max(v, u)
+            y - x < u - l && continue
+            y - x > u - l && break
+            emit(x, y)
+        end
+    end
+end
+
+function all_common_intervals(p::Vector{Int})
+    intervals = NTuple{2,Int}[]
+    all_common_intervals(p) do x, y
+        push!(intervals, (x, y))
+    end
+    return intervals
+end
+
+all_common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
+    all_common_intervals(emit, invperm(p2)[p1])
+all_common_intervals(p1::Vector{Int}, p2::Vector{Int}) =
+    all_common_intervals(invperm(p2)[p1])

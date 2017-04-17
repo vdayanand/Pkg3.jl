@@ -219,7 +219,7 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
             X = X \ Xₐ
             isempty(X) && continue
             P[i] = X
-            insert!(P, i + !between, Xₐ)
+            insert!(P, i + between, Xₐ)
             add_pivot(X, Xₐ)
             i += 1
         end
@@ -258,9 +258,9 @@ function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect
             for (i, X) in enumerate(P)
                 length(X) > 1 || continue
                 x = get(first_pivot, X, first(X))
-                N, A = N_non(x, X), N_adj(x, X)
-                splice!(P, i, filter(!isempty, [N, [x], A]))
-                S, L = smaller_larger(N, A)
+                A, N = N_adj(x, X), N_non(x, X)
+                splice!(P, i, filter(!isempty, [A, [x], N]))
+                S, L = smaller_larger(A, N)
                 center = x
                 push!(pivots, S)
                 push!(modules, L)

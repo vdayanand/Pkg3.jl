@@ -368,7 +368,7 @@ function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{In
             x = t[i]
             x isa StrongModuleTree || continue
             delete_weak_modules!(x)
-            t.kind == x.kind && t.edge == x.edge || continue
+            t.kind == x.kind != :prime && t.edge == x.edge || continue
             splice!(t.nodes, i, x.nodes)
             i += length(x)
         end

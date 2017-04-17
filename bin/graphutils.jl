@@ -377,6 +377,7 @@ function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{In
         end
     end
 
+    # TODO: sort linear nodes linearly
     function sort_nodes!(t::StrongModuleTree)
         sort!(t.nodes, by=sort_nodes!)
         return first_leaf(t)

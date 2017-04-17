@@ -293,6 +293,9 @@ Base.length(t::StrongModuleTree) = length(t.nodes)
 Base.eltype(t::StrongModuleTree) = eltype(t.nodes)
 Base.getindex(t::StrongModuleTree, i::Int) = t.nodes[i]
 
+node_count(t::StrongModuleTree) = length(t)
+node_count(x::Any) = 1
+
 leaf_count(t::StrongModuleTree) = sum(leaf_count, t.nodes)
 leaf_count(v::Vector) = sum(leaf_count, v)
 leaf_count(x::Any) = 1
@@ -305,17 +308,21 @@ last_leaf(t::StrongModuleTree) = first_leaf(last(t.nodes))
 last_leaf(v::Vector) = last_leaf(last(v))
 last_leaf(x::Any) = x
 
-function Base.summary(t::StrongModuleTree)
-    edge = t.kind == :prime ? "" : "/$(join(t.edge,"-"))"
-    "$(length(t))-node $(t.kind)$edge $(typeof(t))"
+function kind_summary(t::StrongModuleTree)
+    edge = t.kind == :prime    ? "" :
+           t.kind == :complete ? "$(t.edge[1])-" :
+                                 "$(join(t.edge,"-"))-"
+    return "$edge$(t.kind)"
 end
 
+Base.summary(t::StrongModuleTree) =
+    "$(length(t))-node $(kind_summary(t)) $(typeof(t))"
+
 function Base.show(io::IO, t::StrongModuleTree)
-    parens = t.kind == :prime ? "{}" : t.kind == :linear ? "[]" : "()"
-    compact = get(io, :compact, false)
-    if compact
-        print(io, parens[1], first_leaf(t), " × ", leaf_count(t), parens[2])
+    if get(io, :compact, false)
+        print(io, kind_summary(t), " ", node_count(t), "-node, ", leaf_count(t), "-leaf module: ", first_leaf(t))
     else
+        parens = t.kind == :prime ? "{}" : t.kind == :linear ? "[]" : "()"
         print(io, parens[1])
         for (i, x) in enumerate(t)
             print(io, x)

@@ -153,13 +153,6 @@ function tournament_factorizing_permutation(T::AbstractMatrix)
 
     function tfp!(lo::Int, hi::Int)
         lo + 1 < hi || return
-        # move minimal value to front
-        i = j = 1
-        while (j += 1) <= hi
-            p[j] < p[i] && (i = j)
-        end
-        p[lo], p[i] = p[i], p[lo]
-        # use first value as pivot
         v = p[lo]
         @assert all(v < p[k] for k = lo+1:hi)
         i, j = lo+1, hi

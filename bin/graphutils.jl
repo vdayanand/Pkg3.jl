@@ -532,8 +532,34 @@ U = triu(G) + triu(G)'
 L = tril(G) + tril(G)'
 TU = StrongModuleTree(U)
 TL = StrongModuleTree(L)
-
 P = permutation_graph(pU, pL)
 
 
 =#
+
+## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
+
+function tournament_factorizing_permutation(T::AbstractMatrix)
+    n = Base.LinAlg.checksquare(T)
+    P = [collect(1:n)]
+    for x = 1:n
+        i = findfirst(C->x in C, P)
+        C = P[i]
+        B = filter(y->x != y && T[x,y] < T[y,x], C)
+        A = filter(y->x != y && T[y,x] < T[x,y], C)
+        splice!(P, i, filter(!isempty, [B, [x], A]))
+    end
+    return map(first, P)
+end
+
+false &&
+for _ = 1:1000
+    global n, T, p
+    n = rand(3:10)
+    T = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
+    T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
+    @assert T + T' + I == ones(n,n)
+    p = tournament_factorizing_permutation(T)
+    modules = all_modules(T)
+    @assert is_modular_permutation(G, p, modules=modules)
+end

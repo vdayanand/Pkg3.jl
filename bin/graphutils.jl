@@ -126,7 +126,8 @@ is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
 
 all_modules(G) = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:size(G,2))))
 
-overlap(A::Vector, B::Vector) = !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
+overlap(A::AbstractVector, B::AbstractVector) =
+    !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
 function strong_modules(G)
     modules = all_modules(G)
@@ -263,6 +264,18 @@ last_leaf(t::StrongModuleTree) = first_leaf(last(t.nodes))
 last_leaf(v::Vector) = last_leaf(last(v))
 last_leaf(x::Any) = x
 
+function leaves(t::StrongModuleTree{T}) where T
+    L = T[]
+    for x in t.nodes
+        if x isa StrongModuleTree
+            append!(L, leaves(x))
+        else
+            push!(L, x)
+        end
+    end
+    return L
+end
+
 edge_string(t::StrongModuleTree, post::String="") =
     edge = t.kind == :prime    ? "" :
            t.kind == :complete ? "$(t.edge[1])$post" :
@@ -281,7 +294,7 @@ function Base.show(io::IO, t::StrongModuleTree)
         )
     else
         parens = t.kind == :prime ? "{}" : t.kind == :linear ? "[]" : "()"
-        print(io, edge_string(t), parens[1])
+        print(io, parens[1])
         for (i, x) in enumerate(t)
             print(io, x)
             i < length(t) && print(io, " ")
@@ -487,20 +500,40 @@ function all_common_intervals(emit::Function, p::Vector{Int})
             l, u = min(v, l), max(v, u)
             y - x < u - l && continue
             y - x > u - l && break
-            emit(x, y)
+            emit(x:y)
         end
     end
 end
 
 function all_common_intervals(p::Vector{Int})
-    intervals = NTuple{2,Int}[]
-    all_common_intervals(p) do x, y
-        push!(intervals, (x, y))
+    intervals = UnitRange{Int}[]
+    all_common_intervals(p) do r
+        push!(intervals, r)
     end
     return intervals
 end
 
-all_common_intervals(emit::Function, p1::Vector{Int}, p2::Vector{Int}) =
-    all_common_intervals(emit, invperm(p2)[p1])
-all_common_intervals(p1::Vector{Int}, p2::Vector{Int}) =
-    all_common_intervals(invperm(p2)[p1])
+function strong_common_intervals(p::Vector{Int})
+    intervals = all_common_intervals(p)
+    return filter(A -> all(B -> !overlap(A, B), intervals), intervals)
+end
+
+## permutation graphs & common intervals
+
+permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
+    Int[xor(p1[i] < p1[j], p2[i] < p2[j]) for i=1:length(p1), j=1:length(p2)]
+
+#=
+Idea for modular decomposition of a digraph, G.
+
+Compute the common intervals of
+
+U = triu(G) + triu(G)'
+L = tril(G) + tril(G)'
+TU = StrongModuleTree(U)
+TL = StrongModuleTree(L)
+
+P = permutation_graph(pU, pL)
+
+
+=#

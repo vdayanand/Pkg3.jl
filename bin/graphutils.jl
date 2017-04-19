@@ -306,7 +306,13 @@ end
 Base.getindex(v::Vector{T}, t::StrongModuleTree) where {T} =
     StrongModuleTree{T}(t.kind, t.edge, map(x->v[x], t.nodes))
 
-function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{Int}, cl::Vector{Int}) where T
+function StrongModuleTree(
+        G::AbstractMatrix,
+        v::AbstractVector{T},
+        op::Vector{Int},
+        cl::Vector{Int};
+        sort::Bool = true,
+    ) where T
 
     function classify_nodes(t::Vector)
         n = length(t)
@@ -366,11 +372,15 @@ function StrongModuleTree(G::AbstractMatrix, v::AbstractVector{T}, op::Vector{In
     end
     t = classify_nodes(s[end])
     delete_weak_modules!(t)
-    sort_nodes!(t)
+    sort && sort_nodes!(t)
     return t
 end
 
-function StrongModuleTree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_permutation(G))
+function StrongModuleTree(
+        G::AbstractMatrix,
+        p::Vector{Int} = graph_factorizing_permutation(G);
+        sort::Bool = true,
+    )
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
@@ -463,7 +473,7 @@ function StrongModuleTree(G::AbstractMatrix, p::Vector{Int}=graph_factorizing_pe
     op[1] -= 1
     cl[n] -= 1
     # construct and normalize the tree
-    return StrongModuleTree(G, p, op, cl)
+    return StrongModuleTree(G, p, op, cl, sort=sort)
 end
 
 false &&
@@ -522,20 +532,6 @@ end
 
 permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
     Int[xor(p1[i] < p1[j], p2[i] < p2[j]) for i=1:length(p1), j=1:length(p2)]
-
-#=
-Idea for modular decomposition of a digraph, G.
-
-Compute the common intervals of
-
-U = triu(G) + triu(G)'
-L = tril(G) + tril(G)'
-TU = StrongModuleTree(U)
-TL = StrongModuleTree(L)
-P = permutation_graph(pU, pL)
-
-
-=#
 
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
 

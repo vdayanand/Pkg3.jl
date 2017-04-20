@@ -562,20 +562,3 @@ for _ = 1:1000
     modules = all_modules(T)
     @assert is_modular_permutation(G, p, modules=modules)
 end
-
-function tournamentize!(G::AbstractMatrix, t::StrongModuleTree = StrongModuleTree(G))
-    if !(t.kind == :complete && t.edge == (false,false))
-        for i = 1:length(t)-1, j=i+1:length(t)
-            for x in leaves(t[i]), y in leaves(t[j])
-                G[x,y] == G[y,x] || continue
-                G[x,y] = (G[x,y] == 0)
-                G[y,x] = (G[y,x] != 0)
-            end
-        end
-    end
-    for x in t.nodes
-        x isa StrongModuleTree && tournamentize!(G, x)
-    end
-    return G
-end
-tournamentize(G::AbstractMatrix) = tournamentize!(copy(G))

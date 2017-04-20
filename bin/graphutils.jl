@@ -275,6 +275,7 @@ function leaves(t::StrongModuleTree{T}) where T
     end
     return L
 end
+leaves(x::Any) = x
 
 edge_string(t::StrongModuleTree, post::String="") =
     edge = t.kind == :prime    ? "" :
@@ -535,6 +536,8 @@ permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
 
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
 
+is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
+
 function tournament_factorizing_permutation(T::AbstractMatrix)
     n = Base.LinAlg.checksquare(T)
     P = [collect(1:n)]
@@ -559,3 +562,20 @@ for _ = 1:1000
     modules = all_modules(T)
     @assert is_modular_permutation(G, p, modules=modules)
 end
+
+function tournamentize!(G::AbstractMatrix, t::StrongModuleTree = StrongModuleTree(G))
+    if !(t.kind == :complete && t.edge == (false,false))
+        for i = 1:length(t)-1, j=i+1:length(t)
+            for x in leaves(t[i]), y in leaves(t[j])
+                G[x,y] == G[y,x] || continue
+                G[x,y] = (G[x,y] == 0)
+                G[y,x] = (G[y,x] != 0)
+            end
+        end
+    end
+    for x in t.nodes
+        x isa StrongModuleTree && tournamentize!(G, x)
+    end
+    return G
+end
+tournamentize(G::AbstractMatrix) = tournamentize!(copy(G))

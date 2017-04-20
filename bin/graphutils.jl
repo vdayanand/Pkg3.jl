@@ -126,7 +126,7 @@ is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
 
 all_modules(G) = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:size(G,2))))
 
-overlap(A::AbstractVector, B::AbstractVector) = A !== B &&
+overlap(A::AbstractVector, B::AbstractVector) =
     !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
 function strong_modules(G)
@@ -506,20 +506,15 @@ function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
 end
 nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
 
-function overlap_components(s::StrongModuleTree{T}, t::StrongModuleTree{T}) where T
-    M = Vector{T}[]
-    append!(M, map(leaves, nodes(s)))
-    append!(M, map(leaves, nodes(t)))
-    i = 0
-    while (i += 1) < length(M)
-        j = i
-        while (j += 1) <= length(M)
-            x, y = M[i], M[j]
-            overlap(x, y) || continue
-            push!(M, x ∪ y)
-        end
+function overlap_components(s::StrongModuleTree, t::StrongModuleTree)
+    M = map(n->sort!(leaves(n)), nodes(s))
+    N = map(n->sort!(leaves(n)), nodes(t))
+    for (i, x) in enumerate(M), (j, y) in enumerate(N)
+        # TODO: efficient overlap checking for sorted vectors
+        overlap(x, y) || continue
+        M[i] = N[j] = sort!(x ∪ y)
     end
-    return M
+    return M ∪ N
 end
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"

@@ -126,7 +126,7 @@ is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
 
 all_modules(G) = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:size(G,2))))
 
-overlap(A::AbstractVector, B::AbstractVector) =
+overlap(A::AbstractVector, B::AbstractVector) = A !== B &&
     !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
 function strong_modules(G)
@@ -494,6 +494,32 @@ for _ = 1:1000
         T′ = StrongModuleTree(G, p′)
         @assert T == T′
     end
+end
+
+function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
+    for x in t.nodes
+        x isa StrongModuleTree || continue
+        nodes!(v, x)
+        push!(v, x)
+    end
+    return v
+end
+nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
+
+function overlap_components(s::StrongModuleTree{T}, t::StrongModuleTree{T}) where T
+    M = Vector{T}[]
+    append!(M, map(leaves, nodes(s)))
+    append!(M, map(leaves, nodes(t)))
+    i = 0
+    while (i += 1) < length(M)
+        j = i
+        while (j += 1) <= length(M)
+            x, y = M[i], M[j]
+            overlap(x, y) || continue
+            push!(M, x ∪ y)
+        end
+    end
+    return M
 end
 
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"

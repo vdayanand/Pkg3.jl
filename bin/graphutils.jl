@@ -495,6 +495,41 @@ for _ = 1:1000
     end
 end
 
+function cosort!(S::StrongModuleTree, T::StrongModuleTree)
+
+    function promote_common_leaf!(S::StrongModuleTree, T::StrongModuleTree)
+        for i = s:length(S), j = t:length(T)
+            if promote_common_leaf!(S[i], T[j], s, t)
+                S.nodes[s], S.nodes[i] = S.nodes[i], S.nodes[s]
+                T.nodes[t], T.nodes[j] = T.nodes[j], T.nodes[t]
+                return true
+            end
+        end
+        return false
+    end
+    function promote_common_leaf!(x::Any, T::StrongModuleTree, s::Int, t::Int)
+        s <= 1 || return false
+        for j = 1:length(T)
+            promote_common_leaf!(x, T[j]) || continue
+            T.nodes[t], T.nodes[j] = T.nodes[j], T.nodes[t]
+            return true
+        end
+        return false
+    end
+    promote_common_leaf!(S::StrongModuleTree, y::Any, s::Int, t::Int) =
+        promote_common_leaf!(y, S, t, s)
+    promote_common_leaf!(x::Any, y::Any, s::Int, t::Int) =
+        s == t == 1 && x == y
+
+    for (i, x) in enumerate(S), (j, y) in enumerate(T)
+        Lx = leaves(x)
+        Ly = leaves(y)
+        if Lx ⊆ Ly
+        elseif Lx ⊇ Ly
+        else
+        end
+end
+
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
 
 #=

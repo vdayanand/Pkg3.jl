@@ -626,3 +626,20 @@ for i = 1:100
     H = Gs + Gd
     @assert is_modular_permutation(H, q)
 end
+
+G = [
+    0  0  1  0  1  0
+    0  0  1  0  1  1
+    1  1  0  1  0  0
+    1  0  0  0  0  0
+    0  0  1  1  0  1
+    0  0  1  0  0  0
+]
+n = checksquare(G)
+Gs = G .| G'
+Gd = G .& G'
+H = Gs + Gd
+tGs = StrongModuleTree(Gs)
+tGd = StrongModuleTree(Gd)
+
+nothing

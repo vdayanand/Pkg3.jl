@@ -262,9 +262,13 @@ first_leaf(t::StrongModuleTree) = first_leaf(first(t.nodes))
 first_leaf(v::Vector) = first_leaf(first(v))
 first_leaf(x::Any) = x
 
-last_leaf(t::StrongModuleTree) = first_leaf(last(t.nodes))
+last_leaf(t::StrongModuleTree) = last_leaf(last(t.nodes))
 last_leaf(v::Vector) = last_leaf(last(v))
 last_leaf(x::Any) = x
+
+rand_leaf(t::StrongModuleTree) = rand_leaf(rand(t.nodes))
+rand_leaf(v::Vector) = rand_leaf(last(v))
+rand_leaf(x::Any) = x
 
 function leaves(t::StrongModuleTree{T}) where T
     L = T[]
@@ -322,16 +326,10 @@ function cosort!(s::StrongModuleTree{Int}, t::StrongModuleTree{Int})
     q = invperm(leaves(t))
     while true
         p == q && break
-        sort!(t, by=x->p[first_leaf(x)])
+        sort!(t, by=x->p[rand_leaf(x)])
         q = invperm(leaves(t))
         p == q && break
-        sort!(s, by=x->q[first_leaf(x)])
-        p = invperm(leaves(s))
-        p == q && break
-        sort!(t, by=x->p[last_leaf(x)])
-        q = invperm(leaves(t))
-        p == q && break
-        sort!(s, by=x->p[last_leaf(x)])
+        sort!(s, by=x->q[rand_leaf(x)])
         p = invperm(leaves(s))
     end
     return invperm(p)

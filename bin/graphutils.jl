@@ -582,21 +582,44 @@ function parent_node(t::StrongModuleTree, S::Vector)
     return t
 end
 
+# TODO: implement linear time algorithm from this thesis:
+## Dalhaus 1998: "Parallel algorithms for hierarchical clustering and
+##   applications to split decomposition and parity graph recognition"
+## There's also a 2000 paper by the same name, but the PDF is jumbled
+
 function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_modules(s), N=strong_modules(t))
-    for (i, x) in enumerate(M), (j, y) in enumerate(N)
-        overlap(x, y) || continue
-        M[i] = N[j] = sort!(x ∪ y)
+    O = M ∪ N
+    n = length(O)
+    R = speye(Int, n)
+    for i = 1:n-1, j = i+1:n
+        overlap(O[i], O[j]) || continue
+        R[i,j] = R[j,i] = 1
     end
-    return M ∪ N
+    while true
+        R′ = min.(1, R^2)
+        R′ == R && break
+        R .= R′
+    end
+    for (i, j) in zip(findn(R)...)
+        i < j || continue
+        O[i] = O[j] = sort!(O[i] ∪ O[j])
+    end
+    return unique(O)
 end
 
-function intersect_components(s::StrongModuleTree, t::StrongModuleTree)
+function intersect_nodes(s::StrongModuleTree, t::StrongModuleTree)
     M = strong_modules(s)
     N = strong_modules(t)
-    filter!(overlap_components(s, t, M, N)) do X
+    U = filter!(overlap_components(s, t, M, N)) do X
         (X in M || parent_node(s, X).kind != :prime) &&
         (X in N || parent_node(t, X).kind != :prime)
     end
+    R = Dict()
+    for X in U
+        Ps, Pt = parent_node(s, X), parent_node(t, X)
+        union!(get!(()->Set{Int}(), R, (Ps, Pt)), X)
+    end
+    return sort!(U ∪ map(sort!∘collect, values(R)), by=length)
 end
 
 ## perfect tournament factorization ##
@@ -647,6 +670,7 @@ for i = 1:100
     @assert is_modular_permutation(H, q)
 end
 
+#=
 G = [
     0  0  1  0  1  0
     0  0  1  0  1  1
@@ -661,5 +685,6 @@ Gd = G .& G'
 H = Gs + Gd
 tGs = StrongModuleTree(Gs)
 tGd = StrongModuleTree(Gd)
+=#
 
 nothing

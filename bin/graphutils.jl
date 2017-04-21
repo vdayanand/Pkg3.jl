@@ -571,16 +571,6 @@ nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
 
 strong_modules(t::StrongModuleTree) = map(sort!∘leaves, nodes(t))
 
-function overlap_components(s::StrongModuleTree, t::StrongModuleTree)
-    M = strong_modules(s)
-    N = strong_modules(t)
-    for (i, x) in enumerate(M), (j, y) in enumerate(N)
-        overlap(x, y) || continue
-        M[i] = N[j] = sort!(x ∪ y)
-    end
-    return M ∪ N
-end
-
 function parent_node(t::StrongModuleTree, S::Vector)
     for x in t.nodes
         x isa StrongModuleTree || continue
@@ -590,6 +580,23 @@ function parent_node(t::StrongModuleTree, S::Vector)
         break
     end
     return t
+end
+
+function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_modules(s), N=strong_modules(t))
+    for (i, x) in enumerate(M), (j, y) in enumerate(N)
+        overlap(x, y) || continue
+        M[i] = N[j] = sort!(x ∪ y)
+    end
+    return M ∪ N
+end
+
+function intersect_components(s::StrongModuleTree, t::StrongModuleTree)
+    M = strong_modules(s)
+    N = strong_modules(t)
+    filter!(overlap_components(s, t, M, N)) do X
+        (X in M || parent_node(s, X).kind != :prime) &&
+        (X in N || parent_node(t, X).kind != :prime)
+    end
 end
 
 ## perfect tournament factorization ##

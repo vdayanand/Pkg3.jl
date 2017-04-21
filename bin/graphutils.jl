@@ -127,17 +127,21 @@ end
 is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
     all(G[i,k] == G[j,k] && G[k,i] == G[k,j] for i in S for j in S for k in indices(G,2)\S)
 
-all_modules(G) = filter!(S->length(S) > 1 && is_module(G, S), collect(subsets(1:size(G,2))))
+function all_modules(G::AbstractMatrix)
+    n = Base.LinAlg.checksquare(G)
+    filter!(S->1 < length(S) < n && is_module(G, S), collect(subsets(1:n)))
+end
 
 overlap(A::AbstractVector, B::AbstractVector) =
-    !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
+    A !== B && !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
-function strong_modules(G)
+function strong_modules(G::AbstractMatrix)
     modules = all_modules(G)
     return filter(A -> all(B -> !overlap(A, B), modules), modules)
 end
 
 function is_modular_permutation(G::AbstractMatrix, p::Vector{Int}; modules=strong_modules(G))
+    isempty(modules) && return true
     diffs = map(M->diff(findin(p, M)), modules)
     maximum(maximum, diffs) == 1
 end
@@ -552,20 +556,24 @@ permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
 
 function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
-    push!(v, t)
     for x in t.nodes
         x isa StrongModuleTree || continue
         nodes!(v, x)
+        push!(v, x)
     end
     return v
 end
 nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
 
+strong_modules(t::StrongModuleTree) = map(sort!∘leaves, nodes(t))
+
 function overlap_components(s::StrongModuleTree, t::StrongModuleTree)
-    M = map(n->sort!(leaves(n)), nodes(s))
-    N = map(n->sort!(leaves(n)), nodes(t))
+    M = strong_modules(s)
+    N = strong_modules(t)
     for (i, x) in enumerate(M), (j, y) in enumerate(N)
         # TODO: efficient overlap checking for sorted vectors
+        # return true as soon as one elt of each is found:
+        # x ∩ y, x \ y, y \ x
         overlap(x, y) || continue
         M[i] = N[j] = sort!(x ∪ y)
     end

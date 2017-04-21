@@ -500,17 +500,17 @@ false &&
 for _ = 1:1000
     global n, G, p, T, p′, T′
     n = rand(3:10)
-    G = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
+    G = rand(0:1, n, n)
     G .= G .⊻ G'
     @assert G == G'
     p = graph_factorizing_permutation(G)
     @assert is_modular_permutation(G, p)
-    T = StrongModuleTree(G, p)
+    T = sort!(StrongModuleTree(G, p))
     # TODO: check that all strong modules are nodes
     for _ = 1:10
         p′ = graph_factorizing_permutation(G, shuffle(1:n))
         @assert is_modular_permutation(G, p′)
-        T′ = StrongModuleTree(G, p′)
+        T′ = sort!(StrongModuleTree(G, p′))
         @assert T == T′
     end
 end
@@ -595,7 +595,7 @@ false &&
 for _ = 1:1000
     global n, T, p
     n = rand(3:10)
-    T = Int[i != j && rand() < 0.5 for i = 1:n, j = 1:n]
+    T = rand(0:1, n, n)
     T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
     @assert T + T' + I == ones(n,n)
     p = tournament_factorizing_permutation(T)

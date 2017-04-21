@@ -607,19 +607,55 @@ function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_m
     return unique(O)
 end
 
-function intersect_nodes(s::StrongModuleTree, t::StrongModuleTree)
-    M = strong_modules(s)
-    N = strong_modules(t)
-    U = filter!(overlap_components(s, t, M, N)) do X
-        (X in M || parent_node(s, X).kind != :prime) &&
-        (X in N || parent_node(t, X).kind != :prime)
+function intersect_trees(G::AbstractMatrix, s::StrongModuleTree{E}, t::StrongModuleTree{E}) where E
+    n = checksquare(G)
+    Ms = strong_modules(s)
+    Mt = strong_modules(t)
+    U = filter!(overlap_components(s, t, Ms, Mt)) do X
+        (X in Ms || parent_node(s, X).kind != :prime) &&
+        (X in Mt || parent_node(t, X).kind != :prime)
     end
     R = Dict()
     for X in U
-        Ps, Pt = parent_node(s, X), parent_node(t, X)
-        union!(get!(()->Set{Int}(), R, (Ps, Pt)), X)
+        S, T = parent_node(s, X), parent_node(t, X)
+        union!(get!(()->Set{Int}(), R, (S, T)), X)
     end
-    return sort!(U ∪ map(sort!∘collect, values(R)), by=length)
+    N = sort!(U ∪ map(sort!∘collect, values(R)), by=length, rev=true)
+    T = Any[[] for x = 1:n]
+    for node in N
+        an = Vector{Any}(node)
+        for x in node
+            push!(T[x], an)
+        end
+    end
+    for x = 1:n, i = 1:length(T[x])-1
+        parent = T[x][i]
+        child = T[x][i+1]
+        child in parent && continue
+        filter!(y->!(y in child), parent)
+        push!(parent, child)
+    end
+    T = T[1][1]
+    @assert leaf_count(T) == n
+    # turn into value, open/close parens vectors
+    v = Array{E}(n)
+    op = zeros(Int, n)
+    cl = zeros(Int, n)
+    let i = 0
+        function emit_parens(a::Vector{Any})
+            for x in a
+                if x isa Vector
+                    op[i+1] += 1
+                    emit_parens(x)
+                    cl[i-1] += 1
+                else
+                    v[i+=1] = x
+                end
+            end
+        end
+        emit_parens(T)
+    end
+    StrongModuleTree(G, v, op, cl)
 end
 
 ## perfect tournament factorization ##

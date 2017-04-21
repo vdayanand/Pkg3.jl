@@ -590,7 +590,7 @@ false &&
 for _ = 1:1000
     global n, T, p
     n = rand(3:10)
-    T = rand(0:1, n, n)
+    T = Int[i != j && rand(Bool) for i=1:n, j=1:n]
     T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
     @assert T + T' + I == ones(n,n)
     p = tournament_factorizing_permutation(T)
@@ -605,7 +605,7 @@ for i = 1:100
     global n, G, Gs, Gd, tGs, tGd, q, H
     println(i)
     n = rand(3:10)
-    G = rand(0:1, n, n)
+    G = Int[i != j && rand(Bool) for i=1:n, j=1:n]
     Gs = G .| G'
     Gd = G .& G'
     tGs = StrongModuleTree(Gs)

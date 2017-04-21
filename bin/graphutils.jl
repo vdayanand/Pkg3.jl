@@ -2,6 +2,7 @@
 
 using Iterators
 using Combinatorics
+using Base.LinAlg: checksquare
 
 #=
 X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
@@ -18,7 +19,7 @@ G1 = full(sparse(
      11, 6, 7, 9, 10, 11, 6, 7, 8, 10, 11, 6, 7, 8, 9, 6, 7, 8, 9],
     1
 ))
-p1 = collect(1:Base.LinAlg.checksquare(G1))
+p1 = collect(1:checksquare(G1))
 
 G2 = full(sparse(
     [1, 1, 1, 2, 3, 3, 3, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 10, 10,
@@ -27,9 +28,9 @@ G2 = full(sparse(
      12, 13, 14, 9, 10, 14, 9, 10, 11, 13, 9, 10, 11, 12, 9, 10, 11],
     1
 ))
-p2 = collect(1:Base.LinAlg.checksquare(G2))
+p2 = collect(1:checksquare(G2))
 
-n = Base.LinAlg.checksquare(G2)
+n = checksquare(G2)
 p = shuffle(1:n)
 G = G2[invperm(p),invperm(p)]
 
@@ -128,7 +129,7 @@ is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
     all(G[i,k] == G[j,k] && G[k,i] == G[k,j] for i in S for j in S for k in indices(G,2)\S)
 
 function all_modules(G::AbstractMatrix)
-    n = Base.LinAlg.checksquare(G)
+    n = checksquare(G)
     filter!(S->1 < length(S) < n && is_module(G, S), collect(subsets(1:n)))
 end
 
@@ -156,7 +157,7 @@ end
 
 ## Habib, Paul & Viennot: "Partition refinement techniques: an interesting algorithmic tool kit"
 
-function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:Base.LinAlg.checksquare(G)))
+function graph_factorizing_permutation(G::AbstractMatrix, V::Vector{Int}=collect(1:checksquare(G)))
 
     P = [V]
     center::Int = 0
@@ -583,7 +584,7 @@ end
 is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
 
 function tournament_factorizing_permutation(T::AbstractMatrix)
-    n = Base.LinAlg.checksquare(T)
+    n = checksquare(T)
     P = [collect(1:n)]
     for x = 1:n
         i = findfirst(C->x in C, P)

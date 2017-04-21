@@ -1,6 +1,7 @@
 ## Some graph functions ##
 
 using Iterators
+using Combinatorics
 
 #=
 X = sparse([1,1,2,2,3,4,4], [2,5,5,3,4,5,6], 1, 6, 6)
@@ -512,27 +513,6 @@ for _ = 1:1000
     end
 end
 
-function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
-    push!(v, t)
-    for x in t.nodes
-        x isa StrongModuleTree || continue
-        nodes!(v, x)
-    end
-    return v
-end
-nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
-
-function overlap_components(s::StrongModuleTree, t::StrongModuleTree)
-    M = map(n->sort!(leaves(n)), nodes(s))
-    N = map(n->sort!(leaves(n)), nodes(t))
-    for (i, x) in enumerate(M), (j, y) in enumerate(N)
-        # TODO: efficient overlap checking for sorted vectors
-        overlap(x, y) || continue
-        M[i] = N[j] = sort!(x ∪ y)
-    end
-    return M ∪ N
-end
-
 ## Uno & Yagiura 2000: "Fast algorithms to enumerate all common intervals of two permutations"
 
 #=
@@ -570,6 +550,27 @@ permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
     Int[xor(p1[i] < p1[j], p2[i] < p2[j]) for i=1:length(p1), j=1:length(p2)]
 
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
+
+function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
+    push!(v, t)
+    for x in t.nodes
+        x isa StrongModuleTree || continue
+        nodes!(v, x)
+    end
+    return v
+end
+nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
+
+function overlap_components(s::StrongModuleTree, t::StrongModuleTree)
+    M = map(n->sort!(leaves(n)), nodes(s))
+    N = map(n->sort!(leaves(n)), nodes(t))
+    for (i, x) in enumerate(M), (j, y) in enumerate(N)
+        # TODO: efficient overlap checking for sorted vectors
+        overlap(x, y) || continue
+        M[i] = N[j] = sort!(x ∪ y)
+    end
+    return M ∪ N
+end
 
 is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
 

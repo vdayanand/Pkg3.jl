@@ -8,7 +8,6 @@ X += X'
 G = dropzeros!(1 - X)
 =#
 
-#=
 G1 = full(sparse(
     [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
      5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
@@ -28,7 +27,10 @@ G2 = full(sparse(
     1
 ))
 p2 = collect(1:Base.LinAlg.checksquare(G2))
-=#
+
+n = Base.LinAlg.checksquare(G2)
+p = shuffle(1:n)
+G = G2[invperm(p),invperm(p)]
 
 const \ = setdiff
 
@@ -307,12 +309,19 @@ end
 Base.getindex(v::Vector{T}, t::StrongModuleTree) where {T} =
     StrongModuleTree{T}(t.kind, t.edge, map(x->v[x], t.nodes))
 
+function Base.sort!(t::StrongModuleTree; lt=isless, by=first_leaf, rev::Bool=false)
+    for x in t.nodes
+        x isa StrongModuleTree || continue
+        sort!(x, lt=lt, by=by, rev=rev)
+    end
+    sort!(t.nodes, lt=lt, by=by, rev=rev)
+end
+
 function StrongModuleTree(
         G::AbstractMatrix,
         v::AbstractVector{T},
         op::Vector{Int},
-        cl::Vector{Int};
-        sort::Bool = true,
+        cl::Vector{Int},
     ) where T
 
     function classify_nodes(t::Vector)
@@ -352,13 +361,6 @@ function StrongModuleTree(
         end
     end
 
-    # TODO: sort linear nodes linearly
-    function sort_nodes!(t::StrongModuleTree)
-        sort!(t.nodes, by=sort_nodes!)
-        return first_leaf(t)
-    end
-    sort_nodes!(x::Any) = x
-
     s = Any[[]]
     for (j, x) = enumerate(v)
         for _ = 1:op[j]
@@ -373,15 +375,14 @@ function StrongModuleTree(
     end
     t = classify_nodes(s[end])
     delete_weak_modules!(t)
-    sort && sort_nodes!(t)
     return t
 end
 
 function StrongModuleTree(
         G::AbstractMatrix,
-        p::Vector{Int} = graph_factorizing_permutation(G);
-        sort::Bool = true,
+        p::Vector{Int} = graph_factorizing_permutation(G)
     )
+
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
@@ -474,7 +475,7 @@ function StrongModuleTree(
     op[1] -= 1
     cl[n] -= 1
     # construct and normalize the tree
-    return StrongModuleTree(G, p, op, cl, sort=sort)
+    return StrongModuleTree(G, p, op, cl)
 end
 
 false &&

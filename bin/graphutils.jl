@@ -134,6 +134,9 @@ function all_modules(G::AbstractMatrix)
 end
 
 overlap(A::AbstractVector, B::AbstractVector) =
+    # TODO: efficient overlap checking for sorted vectors
+    # return true as soon as one elt of each is found:
+    # x ∩ y, x \ y, y \ x
     A !== B && !isempty(A \ B) && !isempty(A ∩ B) && !isempty(B \ A)
 
 function strong_modules(G::AbstractMatrix)
@@ -572,14 +575,24 @@ function overlap_components(s::StrongModuleTree, t::StrongModuleTree)
     M = strong_modules(s)
     N = strong_modules(t)
     for (i, x) in enumerate(M), (j, y) in enumerate(N)
-        # TODO: efficient overlap checking for sorted vectors
-        # return true as soon as one elt of each is found:
-        # x ∩ y, x \ y, y \ x
         overlap(x, y) || continue
         M[i] = N[j] = sort!(x ∪ y)
     end
     return M ∪ N
 end
+
+function parent_node(t::StrongModuleTree, S::Vector)
+    for x in t.nodes
+        x isa StrongModuleTree || continue
+        L = leaves(x)
+        isempty(S ∩ L) && continue
+        S ⊆ L && length(S) < length(L) && return parent_node(x, S)
+        break
+    end
+    return t
+end
+
+## perfect tournament factorization ##
 
 is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
 

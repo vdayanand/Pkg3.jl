@@ -320,7 +320,8 @@ end
 function cosort!(s::StrongModuleTree{Int}, t::StrongModuleTree{Int})
     p = invperm(leaves(s))
     q = invperm(leaves(t))
-    while true
+    for i = 1:typemax(Int)
+        println("cosort! $i")
         p == q && break
         sort!(t, by=x->p[rand_leaf(x)])
         q = invperm(leaves(t))
@@ -512,10 +513,10 @@ for _ = 1:1000
 end
 
 function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
+    push!(v, t)
     for x in t.nodes
         x isa StrongModuleTree || continue
         nodes!(v, x)
-        push!(v, x)
     end
     return v
 end
@@ -565,8 +566,6 @@ function strong_common_intervals(p::Vector{Int})
     return filter(A -> all(B -> !overlap(A, B), intervals), intervals)
 end
 
-## permutation graphs & common intervals
-
 permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
     Int[xor(p1[i] < p1[j], p2[i] < p2[j]) for i=1:length(p1), j=1:length(p2)]
 
@@ -597,4 +596,23 @@ for _ = 1:1000
     p = tournament_factorizing_permutation(T)
     modules = all_modules(T)
     @assert is_modular_permutation(G, p, modules=modules)
+end
+
+## digraph factorization ##
+
+false &&
+for i = 1:100
+    global n, G, Gs, Gd, tGs, tGd, q, H
+    println(i)
+    n = rand(3:10)
+    G = rand(0:1, n, n)
+    Gs = G .| G'
+    Gd = G .& G'
+    tGs = StrongModuleTree(Gs)
+    tGd = StrongModuleTree(Gd)
+    println("BEFORE")
+    q = cosort!(tGs, tGd)
+    println("AFTER")
+    H = Gs + Gd
+    @assert is_modular_permutation(H, q)
 end

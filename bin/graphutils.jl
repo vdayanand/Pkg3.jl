@@ -273,15 +273,11 @@ rand_leaf(x::Any) = x
 function leaves(t::StrongModuleTree{T}) where T
     L = T[]
     for x in t.nodes
-        if x isa StrongModuleTree
-            append!(L, leaves(x))
-        else
-            push!(L, x)
-        end
+        append!(L, leaves(x))
     end
     return L
 end
-leaves(x::Any) = x
+leaves(x::Any) = [x]
 
 edge_string(t::StrongModuleTree, post::String="") =
     edge = t.kind == :prime    ? "" :

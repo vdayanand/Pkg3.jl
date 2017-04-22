@@ -326,21 +326,6 @@ function Base.sort!(t::StrongModuleTree; lt=isless, by=first_leaf, rev::Bool=fal
     sort!(t.nodes, lt=lt, by=by, rev=rev)
 end
 
-function cosort!(s::StrongModuleTree{Int}, t::StrongModuleTree{Int})
-    p = invperm(leaves(s))
-    q = invperm(leaves(t))
-    for i = 1:typemax(Int)
-        println("cosort! $i")
-        p == q && break
-        sort!(t, by=x->p[rand_leaf(x)])
-        q = invperm(leaves(t))
-        p == q && break
-        sort!(s, by=x->q[rand_leaf(x)])
-        p = invperm(leaves(s))
-    end
-    return invperm(p)
-end
-
 function StrongModuleTree(
         G::AbstractMatrix,
         v::AbstractVector{T},

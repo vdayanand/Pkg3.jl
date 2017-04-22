@@ -613,14 +613,15 @@ function intersect_permutation(V::AbstractVector{E}, s::StrongModuleTree{E}, t::
         (X in Ms || parent_node(s, X).kind != :prime) &&
         (X in Mt || parent_node(t, X).kind != :prime)
     end
+    for x in V; push!(U, [x]); end
     R = Dict()
     for X in U
         S, T = parent_node(s, X), parent_node(t, X)
         union!(get!(()->Set{Int}(), R, (S, T)), X)
     end
-    N = sort!(U ∪ map(sort!∘collect, values(R)), by=length, rev=true)
+    N = filter!(X->1 < length(X), U ∪ map(sort!∘collect, values(R)))
     T = Any[[] for x in V]
-    for node in N
+    for node in sort!(N, by=length, rev=true)
         an = Vector{Any}(node)
         for x in node
             push!(T[x], an)
@@ -687,26 +688,7 @@ for i = 1:100
     s = StrongModuleTree(Gs)
     t = StrongModuleTree(Gd)
     p = intersect_permutation(n, s, t)
-    is_modular_permutation(H, p) || warn("FAILED")
+    @assert is_modular_permutation(H, p)
 end
-
-#= Failing examples:
-
-6×6 Array{Int64,2}:
- 0  1  1  1  1  1
- 1  0  0  0  1  1
- 0  1  0  0  1  1
- 0  0  0  0  0  0
- 1  1  0  1  0  1
- 0  0  0  1  0  0
-
-5×5 Array{Int64,2}:
- 0  1  1  1  1
- 1  0  0  0  1
- 1  1  0  0  1
- 0  1  0  0  0
- 1  1  1  1  0
-
-=#
 
 nothing

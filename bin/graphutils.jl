@@ -544,6 +544,39 @@ permutation_graph(p1::Vector{Int}, p2::Vector{Int}) =
 
 ## McConnell & Montgolfier 2004: "Linear-time modular decomposition of directed graphs"
 
+## perfect tournament factorization ##
+
+is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
+
+function tournament_factorizing_permutation(
+        T::AbstractMatrix,
+        V::Vector{Int} = collect(1:checksquare(T)),
+    )
+    n, P = length(V), [V]
+    for x = V
+        i = findfirst(C->x in C, P)
+        C = P[i]
+        B = filter(y->x != y && T[x,y] < T[y,x], C)
+        A = filter(y->x != y && T[y,x] < T[x,y], C)
+        splice!(P, i, filter(!isempty, [B, [x], A]))
+    end
+    return map(first, P)
+end
+
+false &&
+for _ = 1:1000
+    # global n, T, p
+    n = rand(3:10)
+    T = Int[i != j && rand(Bool) for i=1:n, j=1:n]
+    T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
+    @assert is_tournament(T)
+    p = tournament_factorizing_permutation(T)
+    modules = all_modules(T)
+    @assert is_modular_permutation(G, p, modules=modules)
+end
+
+## digraph factorization ##
+
 function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
     for x in t.nodes
         x isa StrongModuleTree || continue
@@ -676,41 +709,8 @@ function digraph_factorizing_permutation(G::AbstractMatrix)
     return leaves(h)
 end
 
-## perfect tournament factorization ##
-
-is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
-
-function tournament_factorizing_permutation(
-        T::AbstractMatrix,
-        V::Vector{Int} = collect(1:checksquare(T)),
-    )
-    n, P = length(V), [V]
-    for x = V
-        i = findfirst(C->x in C, P)
-        C = P[i]
-        B = filter(y->x != y && T[x,y] < T[y,x], C)
-        A = filter(y->x != y && T[y,x] < T[x,y], C)
-        splice!(P, i, filter(!isempty, [B, [x], A]))
-    end
-    return map(first, P)
-end
-
 false &&
-for _ = 1:1000
-    # global n, T, p
-    n = rand(3:10)
-    T = Int[i != j && rand(Bool) for i=1:n, j=1:n]
-    T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
-    @assert is_tournament(T)
-    p = tournament_factorizing_permutation(T)
-    modules = all_modules(T)
-    @assert is_modular_permutation(G, p, modules=modules)
-end
-
-## digraph factorization ##
-
-false &&
-for i = 1:100
+for i = 1:1000
     # global n, G, p
     n = rand(3:10)
     G = Int[i != j && rand(Bool) for i=1:n, j=1:n]

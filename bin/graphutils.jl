@@ -646,23 +646,30 @@ function digraph_factorizing_permutation(G::AbstractMatrix)
     Gs = G .| G'
     Gd = G .& G'
     H = Gs + Gd
+    n = checksquare(G)
     s = StrongModuleTree(Gs)
     t = StrongModuleTree(Gd)
     p = intersect_permutation(n, s, t)
     h = StrongModuleTree(H, p)
     function sort_leaves!(h)
         for x in h.nodes
-            x isa StrongModuleTree && sort_leaves!(h)
+            x isa StrongModuleTree && sort_leaves!(x)
         end
         h.kind == :complete || return
         if h.edge == (1,1) # tournament node
-            V = map(first_leaf, h.nodes)
-            @assert is_tournament(G[V,V])
-            q = tournament_factorizing_permutation(G, V)
+            X = map(first_leaf, h.nodes)
+            @assert is_tournament(G[X,X])
+            q = tournament_factorizing_permutation(G, X)
             o = Dict(x => i for (i, x) in enumerate(q))
-            sort!(h, by=x->o[first_leaf(x)])
+            sort!(h.nodes, by=x->o[first_leaf(x)])
         else # 0/1-complete node
-
+            d = Dict()
+            c = (1:n)\leaves(h)
+            for x in h.nodes
+                i = first_leaf(x)
+                push!(get!(d, G[c,i], []), x)
+            end
+            h.nodes .= [x for v in values(d) for x in v]
         end
     end
     sort_leaves!(h)
@@ -704,16 +711,11 @@ end
 
 false &&
 for i = 1:100
-    # global n, G, Gs, Gd, s, t, p, H
+    # global n, G, p
     n = rand(3:10)
     G = Int[i != j && rand(Bool) for i=1:n, j=1:n]
-    Gs = G .| G'
-    Gd = G .& G'
-    H = Gs + Gd
-    s = StrongModuleTree(Gs)
-    t = StrongModuleTree(Gd)
-    p = intersect_permutation(n, s, t)
-    @assert is_modular_permutation(H, p)
+    p = digraph_factorizing_permutation(G)
+    @assert is_modular_permutation(G, p)
 end
 
 nothing

@@ -608,7 +608,8 @@ function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_m
 end
 
 function intersect_permutation(V::AbstractVector{E}, s::StrongModuleTree{E}, t::StrongModuleTree{E}) where E
-    Ms, Mt = strong_modules(s), strong_modules(t)
+    Ms = strong_modules(s)
+    Mt = strong_modules(t)
     U = filter!(overlap_components(s, t, Ms, Mt)) do X
         (X in Ms || parent_node(s, X).kind != :prime) &&
         (X in Mt || parent_node(t, X).kind != :prime)
@@ -616,10 +617,12 @@ function intersect_permutation(V::AbstractVector{E}, s::StrongModuleTree{E}, t::
     for x in V; push!(U, [x]); end
     R = Dict()
     for X in U
-        S, T = parent_node(s, X), parent_node(t, X)
+        S = parent_node(t, X)
+        T = parent_node(s, X)
         union!(get!(()->Set{Int}(), R, (S, T)), X)
     end
-    N = filter!(X->1 < length(X), U ∪ map(sort!∘collect, values(R)))
+    N = U ∪ map(sort!∘collect, values(R))
+    N = filter!(X->length(X) > 1, N)
     T = Any[[] for x in V]
     for node in sort!(N, by=length, rev=true)
         an = Vector{Any}(node)

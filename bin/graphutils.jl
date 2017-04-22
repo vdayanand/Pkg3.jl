@@ -130,7 +130,7 @@ is_module(G::AbstractMatrix, S::Vector{Int}) = !isempty(S) &&
 
 function all_modules(G::AbstractMatrix)
     n = checksquare(G)
-    filter!(S->1 < length(S) < n && is_module(G, S), collect(subsets(1:n)))
+    filter!(S->1 < length(S) && is_module(G, S), collect(subsets(1:n)))
 end
 
 overlap(A::AbstractVector, B::AbstractVector) =
@@ -563,8 +563,8 @@ function nodes!(v::Vector{StrongModuleTree{T}}, t::StrongModuleTree{T}) where T
     for x in t.nodes
         x isa StrongModuleTree || continue
         nodes!(v, x)
-        push!(v, x)
     end
+    push!(v, t)
     return v
 end
 nodes(t::StrongModuleTree) = nodes!(typeof(t)[], t)
@@ -607,10 +607,8 @@ function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_m
     return unique(O)
 end
 
-function intersect_trees(G::AbstractMatrix, s::StrongModuleTree{E}, t::StrongModuleTree{E}) where E
-    n = checksquare(G)
-    Ms = strong_modules(s)
-    Mt = strong_modules(t)
+function intersect_permutation(V::AbstractVector{E}, s::StrongModuleTree{E}, t::StrongModuleTree{E}) where E
+    Ms, Mt = strong_modules(s), strong_modules(t)
     U = filter!(overlap_components(s, t, Ms, Mt)) do X
         (X in Ms || parent_node(s, X).kind != :prime) &&
         (X in Mt || parent_node(t, X).kind != :prime)
@@ -621,14 +619,14 @@ function intersect_trees(G::AbstractMatrix, s::StrongModuleTree{E}, t::StrongMod
         union!(get!(()->Set{Int}(), R, (S, T)), X)
     end
     N = sort!(U ∪ map(sort!∘collect, values(R)), by=length, rev=true)
-    T = Any[[] for x = 1:n]
+    T = Any[[] for x in V]
     for node in N
         an = Vector{Any}(node)
         for x in node
             push!(T[x], an)
         end
     end
-    for x = 1:n, i = 1:length(T[x])-1
+    for x in V, i = 1:length(T[x])-1
         parent = T[x][i]
         child = T[x][i+1]
         child in parent && continue
@@ -636,27 +634,15 @@ function intersect_trees(G::AbstractMatrix, s::StrongModuleTree{E}, t::StrongMod
         push!(parent, child)
     end
     T = T[1][1]
-    @assert leaf_count(T) == n
-    # turn into value, open/close parens vectors
-    v = Array{E}(n)
-    op = zeros(Int, n)
-    cl = zeros(Int, n)
-    let i = 0
-        function emit_parens(a::Vector{Any})
-            for x in a
-                if x isa Vector
-                    op[i+1] += 1
-                    emit_parens(x)
-                    cl[i-1] += 1
-                else
-                    v[i+=1] = x
-                end
-            end
-        end
-        emit_parens(T)
-    end
-    StrongModuleTree(G, v, op, cl)
+    p = E[]
+    record_vals(v::Vector) = foreach(record_vals, v)
+    record_vals(x::E) = push!(p, x)
+    record_vals(T)
+    return p
 end
+
+intersect_permutation(n::Int, s::StrongModuleTree{Int}, t::StrongModuleTree{Int}) =
+    intersect_permutation(1:n, s, t)
 
 ## perfect tournament factorization ##
 
@@ -691,36 +677,36 @@ end
 
 false &&
 for i = 1:100
-    global n, G, Gs, Gd, tGs, tGd, q, H
+    global n, G, Gs, Gd, s, t, p, H
     println(i)
     n = rand(3:10)
     G = Int[i != j && rand(Bool) for i=1:n, j=1:n]
     Gs = G .| G'
     Gd = G .& G'
-    tGs = StrongModuleTree(Gs)
-    tGd = StrongModuleTree(Gd)
-    println("BEFORE")
-    q = cosort!(tGs, tGd)
-    println("AFTER")
     H = Gs + Gd
-    @assert is_modular_permutation(H, q)
+    s = StrongModuleTree(Gs)
+    t = StrongModuleTree(Gd)
+    p = intersect_permutation(n, s, t)
+    is_modular_permutation(H, p) || warn("FAILED")
 end
 
-#=
-G = [
-    0  0  1  0  1  0
-    0  0  1  0  1  1
-    1  1  0  1  0  0
-    1  0  0  0  0  0
-    0  0  1  1  0  1
-    0  0  1  0  0  0
-]
-n = checksquare(G)
-Gs = G .| G'
-Gd = G .& G'
-H = Gs + Gd
-tGs = StrongModuleTree(Gs)
-tGd = StrongModuleTree(Gd)
+#= Failing examples:
+
+6×6 Array{Int64,2}:
+ 0  1  1  1  1  1
+ 1  0  0  0  1  1
+ 0  1  0  0  1  1
+ 0  0  0  0  0  0
+ 1  1  0  1  0  1
+ 0  0  0  1  0  0
+
+5×5 Array{Int64,2}:
+ 0  1  1  1  1
+ 1  0  0  0  1
+ 1  1  0  0  1
+ 0  1  0  0  0
+ 1  1  1  1  0
+
 =#
 
 nothing

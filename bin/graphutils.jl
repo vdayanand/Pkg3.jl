@@ -324,15 +324,15 @@ function Base.sort!(t::StrongModuleTree; lt=isless, by=first_leaf, rev::Bool=fal
         sort!(x, lt=lt, by=by, rev=rev)
     end
     sort!(t.nodes, lt=lt, by=by, rev=rev)
+    return t
 end
 
 function StrongModuleTree(
-        G::AbstractMatrix,
-        v::AbstractVector{T},
-        op::Vector{Int},
-        cl::Vector{Int},
-    ) where T
-
+    G::AbstractMatrix,
+    v::AbstractVector{T},
+    op::Vector{Int},
+    cl::Vector{Int},
+) where T
     function classify_nodes(t::Vector)
         n = length(t)
         counts = zeros(Int, n)
@@ -388,10 +388,9 @@ function StrongModuleTree(
 end
 
 function StrongModuleTree(
-        G::AbstractMatrix,
-        p::Vector{Int} = graph_factorizing_permutation(G)
-    )
-
+    G::AbstractMatrix,
+    p::Vector{Int} = graph_factorizing_permutation(G),
+)
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
@@ -488,8 +487,8 @@ function StrongModuleTree(
 end
 
 false &&
-for _ = 1:1000
-    global n, G, p, T, p′, T′
+for _ = 1:100
+    # global n, G, p, T, p′, T′
     n = rand(3:10)
     G = rand(0:1, n, n)
     G .= G .⊻ G'
@@ -497,7 +496,8 @@ for _ = 1:1000
     p = graph_factorizing_permutation(G)
     @assert is_modular_permutation(G, p)
     T = sort!(StrongModuleTree(G, p))
-    # TODO: check that all strong modules are nodes
+    @assert sort!(strong_modules(T), lt=lexless) ==
+            sort!(strong_modules(G), lt=lexless)
     for _ = 1:10
         p′ = graph_factorizing_permutation(G, shuffle(1:n))
         @assert is_modular_permutation(G, p′)
@@ -572,7 +572,12 @@ end
 ##   applications to split decomposition and parity graph recognition"
 ## There's also a 2000 paper by the same name, but the PDF is jumbled
 
-function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_modules(s), N=strong_modules(t))
+function overlap_components(
+    s::StrongModuleTree,
+    t::StrongModuleTree,
+    M = strong_modules(s),
+    N = strong_modules(t),
+)
     O = M ∪ N
     n = length(O)
     R = speye(Int, n)
@@ -592,7 +597,11 @@ function overlap_components(s::StrongModuleTree, t::StrongModuleTree, M=strong_m
     return unique(O)
 end
 
-function intersect_permutation(V::AbstractVector{E}, s::StrongModuleTree{E}, t::StrongModuleTree{E}) where E
+function intersect_permutation(
+    V::AbstractVector{E},
+    s::StrongModuleTree{E},
+    t::StrongModuleTree{E},
+) where E
     Ms = strong_modules(s)
     Mt = strong_modules(t)
     U = filter!(overlap_components(s, t, Ms, Mt)) do X
@@ -652,7 +661,7 @@ end
 
 false &&
 for _ = 1:1000
-    global n, T, p
+    # global n, T, p
     n = rand(3:10)
     T = Int[i != j && rand(Bool) for i=1:n, j=1:n]
     T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
@@ -666,8 +675,7 @@ end
 
 false &&
 for i = 1:100
-    global n, G, Gs, Gd, s, t, p, H
-    println(i)
+    # global n, G, Gs, Gd, s, t, p, H
     n = rand(3:10)
     G = Int[i != j && rand(Bool) for i=1:n, j=1:n]
     Gs = G .| G'

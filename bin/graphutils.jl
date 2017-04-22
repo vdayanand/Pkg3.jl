@@ -695,7 +695,7 @@ function digraph_factorizing_permutation(G::AbstractMatrix)
             q = tournament_factorizing_permutation(G, X)
             o = Dict(x => i for (i, x) in enumerate(q))
             sort!(h.nodes, by=x->o[first_leaf(x)])
-        else # 0/1-complete node
+        else # 0/2-complete node
             d = Dict()
             c = (1:n)\leaves(h)
             for x in h.nodes

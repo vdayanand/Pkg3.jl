@@ -642,14 +642,43 @@ end
 intersect_permutation(n::Int, s::StrongModuleTree{Int}, t::StrongModuleTree{Int}) =
     intersect_permutation(1:n, s, t)
 
+function digraph_factorizing_permutation(G::AbstractMatrix)
+    Gs = G .| G'
+    Gd = G .& G'
+    H = Gs + Gd
+    s = StrongModuleTree(Gs)
+    t = StrongModuleTree(Gd)
+    p = intersect_permutation(n, s, t)
+    h = StrongModuleTree(H, p)
+    function sort_leaves!(h)
+        for x in h.nodes
+            x isa StrongModuleTree && sort_leaves!(h)
+        end
+        h.kind == :complete || return
+        if h.edge == (1,1) # tournament node
+            V = map(first_leaf, h.nodes)
+            @assert is_tournament(G[V,V])
+            q = tournament_factorizing_permutation(G, V)
+            o = Dict(x => i for (i, x) in enumerate(q))
+            sort!(h, by=x->o[first_leaf(x)])
+        else # 0/1-complete node
+
+        end
+    end
+    sort_leaves!(h)
+    return leaves(h)
+end
+
 ## perfect tournament factorization ##
 
 is_tournament(G::AbstractMatrix) = G + G' + I == ones(G)
 
-function tournament_factorizing_permutation(T::AbstractMatrix)
-    n = checksquare(T)
-    P = [collect(1:n)]
-    for x = 1:n
+function tournament_factorizing_permutation(
+        T::AbstractMatrix,
+        V::Vector{Int} = collect(1:checksquare(T)),
+    )
+    n, P = length(V), [V]
+    for x = V
         i = findfirst(C->x in C, P)
         C = P[i]
         B = filter(y->x != y && T[x,y] < T[y,x], C)
@@ -665,7 +694,7 @@ for _ = 1:1000
     n = rand(3:10)
     T = Int[i != j && rand(Bool) for i=1:n, j=1:n]
     T .= T .⊻ T' .⊻ tril(ones(Int,n,n),-1)
-    @assert T + T' + I == ones(n,n)
+    @assert is_tournament(T)
     p = tournament_factorizing_permutation(T)
     modules = all_modules(T)
     @assert is_modular_permutation(G, p, modules=modules)

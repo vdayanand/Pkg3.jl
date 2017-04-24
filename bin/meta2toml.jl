@@ -149,6 +149,18 @@ julia_versions(vi::VersionInterval) = julia_versions(v->v in vi)
 macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 
 function prune!(packages::Associative{String,Package})
+    # remove mutual dependencies
+    for (pkg, dep) in [("Anasol", "Mads"),
+                       ("BIGUQ", "Mads"),
+                       ("Graphics", "Colors"),
+                       ("AWSLambda", "AWSSNS"),
+                       ("URIParser", "HttpCommon")]
+        p = packages[pkg]
+        for (ver, v) in p.versions
+            delete!(v.requires, dep)
+        end
+    end
+    # remove unsatisfiable versions
     while true
         clean = true
         filter!(packages) do pkg, p
@@ -287,24 +299,24 @@ function requires_map()
 end
 
 function incompatibility_matrix()
-    G = spzeros(Int, n, n)
+    X = spzeros(Int, n, n)
     for (i, (p1, v1)) in enumerate(versions),
         (j, (p2, v2)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
         if haskey(r, p2) && v2 ∉ r[p2].versions
-            G[i,j] = G[j,i] = 1
+            X[i,j] = X[j,i] = 1
         end
     end
-    return G
+    return X
 end
 
-function iterate_dependencies(G, P, R; verbose=false)
-    G = max.(0, G - I) # make each node not its own neighbor
-    D = max.(0, min.(1, P'R + I) .- G)
+function iterate_dependencies(X, P, R; verbose=false)
+    X = max.(0, X - I) # make each node not its own neighbor
+    D = max.(0, min.(1, P'R + I) .- X)
     for i = 1:typemax(Int)
         n = nnz(D)
         verbose && println("Density $i: $(n/length(D))")
-        D .= max.(0, min.(1, D^2) .- G)
+        D .= max.(0, min.(1, D^2) .- X)
         nnz(D) <= n && break
     end
     return D
@@ -312,13 +324,19 @@ end
 
 const pkg_map = package_map()
 const req_map = requires_map()
-const G = incompatibility_matrix()
+const X = incompatibility_matrix()
 const P = sparse(pkg_map, 1:n, 1, m, n)
 const R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
-const D = iterate_dependencies(G, P, R)
+const D = iterate_dependencies(X, P, R)
 const Dp = min.(1, D*P')
+const D1 = max.(0, P'R .- X)
+@assert iszero(D1 .& D1') # no mutual dependencies
+@assert iszero(D1 .& X) # explict conflicts can't satisfy requirements
+const G = D1 + X
+@assert G .& G' == X
+@assert max.(0, G .- G') == D1
 
 include("graphutils.jl")
 

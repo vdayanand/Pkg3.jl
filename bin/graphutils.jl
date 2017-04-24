@@ -10,6 +10,7 @@ X += X'
 G = dropzeros!(1 - X)
 =#
 
+#=
 G1 = full(sparse(
     [1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5,
      5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
@@ -33,6 +34,7 @@ p2 = collect(1:checksquare(G2))
 n = checksquare(G2)
 p = shuffle(1:n)
 G = G2[invperm(p),invperm(p)]
+=#
 
 const \ = setdiff
 
@@ -387,10 +389,7 @@ function StrongModuleTree(
     return t
 end
 
-function StrongModuleTree(
-    G::AbstractMatrix,
-    p::Vector{Int} = graph_factorizing_permutation(G),
-)
+function StrongModuleTree(G::AbstractMatrix, p::Vector{Int})
     n = length(p)
     op = zeros(Int,n); op[1] = 1
     cl = zeros(Int,n); cl[n] = 1
@@ -680,8 +679,8 @@ function digraph_factorizing_permutation(G::AbstractMatrix)
     Gd = G .& G'
     H = Gs + Gd
     n = checksquare(G)
-    s = StrongModuleTree(Gs)
-    t = StrongModuleTree(Gd)
+    s = StrongModuleTree(Gs, graph_factorizing_permutation(Gs))
+    t = StrongModuleTree(Gd, graph_factorizing_permutation(Gd))
     p = intersect_permutation(n, s, t)
     h = StrongModuleTree(H, p)
     function sort_leaves!(h)

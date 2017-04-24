@@ -679,8 +679,10 @@ function digraph_factorizing_permutation(G::AbstractMatrix)
     Gd = G .& G'
     H = Gs + Gd
     n = checksquare(G)
-    s = StrongModuleTree(Gs, graph_factorizing_permutation(Gs))
-    t = StrongModuleTree(Gd, graph_factorizing_permutation(Gd))
+    ps = graph_factorizing_permutation(Gs)
+    pd = graph_factorizing_permutation(Gd)
+    s = StrongModuleTree(Gs, ps)
+    t = StrongModuleTree(Gd, pd)
     p = intersect_permutation(n, s, t)
     h = StrongModuleTree(H, p)
     function sort_leaves!(h)
@@ -690,7 +692,6 @@ function digraph_factorizing_permutation(G::AbstractMatrix)
         h.kind == :complete || return
         if h.edge == (1,1) # tournament node
             X = map(first_leaf, h.nodes)
-            @assert is_tournament(G[X,X])
             q = tournament_factorizing_permutation(G, X)
             o = Dict(x => i for (i, x) in enumerate(q))
             sort!(h.nodes, by=x->o[first_leaf(x)])

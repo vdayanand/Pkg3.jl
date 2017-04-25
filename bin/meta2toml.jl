@@ -4,6 +4,7 @@ using Base.Random: UUID
 using Base.Pkg.Types
 using Base.Pkg.Reqs: Reqs, Requirement
 using Base: thispatch, thisminor, nextpatch, nextminor
+using Base.LinAlg: checksquare
 using SHA
 
 ## General utility functions ##
@@ -322,21 +323,46 @@ function iterate_dependencies(X, P, R; verbose=false)
     return D
 end
 
+function unsatisfiable_pairs(D, X1, R, P)
+    n = checksquare(D)
+    @assert n == checksquare(X1)
+    S = zeros(Bool, n, n)
+    for i = 1:n
+        println(i)
+        for j = 1:n
+            X1[i,j] == 0 || continue # skip directly incompatible pairs
+            S[i,j] == 0 || continue # skip discovered compatible pairs
+            v = SparseVector(n, [i, j], [1, 1])
+            d = max.(0, min.(1, D*v) .- X1*v)
+            all(min.(1, R*d) .<= min.(1, P*d)) || continue
+            @assert iszero(d'X1*d) # FAILS
+            c = find(d)
+            S[c,c] = 1
+        end
+    end
+    S .= .!S # negate bools
+    sparse(findn(S)..., 1, n, n)
+end
+
 const pkg_map = package_map()
 const req_map = requires_map()
-const X = incompatibility_matrix()
 const P = sparse(pkg_map, 1:n, 1, m, n)
 const R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
-const D = iterate_dependencies(X, P, R)
+const X1 = incompatibility_matrix()
+const D1 = max.(0, P'R .- X1)
+const D = iterate_dependencies(X1, P, R)
 const Dp = min.(1, D*P')
-const D1 = max.(0, P'R .- X)
-@assert iszero(D1 .& D1') # no mutual dependencies
-@assert iszero(D1 .& X) # explict conflicts can't satisfy requirements
-const G = D1 + X
-@assert G .& G' == X
-@assert max.(0, G .- G') == D1
+const X = unsatisfiable_pairs(D, X1, P, R)
+# D1 .= max.(0, D1 .- X)
+# D .= max.(0, D .- X)
+
+# @assert iszero(D1 .& D1') # no mutual dependencies
+# @assert iszero(D1 .& X) # explict conflicts can't satisfy requirements
+# const G = D1 + X
+# @assert G .& G' == X
+# @assert max.(0, G .- G') == D1
 
 include("graphutils.jl")
 

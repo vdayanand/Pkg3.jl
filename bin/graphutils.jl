@@ -97,24 +97,11 @@ function find_independent_set(G::AbstractMatrix, R::Vector{Int}, inds::Vector{In
     found = Int[]
     G = min.(1, G + I) # make each node its own neighbor
     BronKerboschTomita(G, R, inds \ R, Int[]) do R
+        iszero(G[R,R] - I) || return :continue
         found = sort!(R)
-        :break
+        return :break
     end
     return found
-end
-
-function satisfiable_pairs(G::AbstractMatrix, inds::Vector{Int}=collect(1:size(G,2)))
-    G = min.(1, G + I) # make each node its own neighbor
-    S = zeros(Int, length(inds), length(inds))
-    for (i, x) in enumerate(inds), (j, y) in enumerate(inds)
-        G[x,y] != 0 && continue
-        S[i,j] != 0 && continue
-        v = find_independent_set(G, [x, y], inds)
-        @assert iszero(G[v,v] - I)
-        w = findin(inds, v)
-        S[w,w] = 1
-    end
-    return S
 end
 
 function is_satisfied(V::Vector{Int})

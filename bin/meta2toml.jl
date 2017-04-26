@@ -365,10 +365,24 @@ X = X1
 # G[v, p] = 1 ⟺ v requires p
 # G[v, w] = 1 ⟺ v and w are incompatible
 
-G = [spzeros(Int, m, m) P; R' X]
 pv = [packages; versions]
+G = [spzeros(Int, m, m) P; R' X]
 
-# const X = unsatisfiable_pairs(D, X1, P, R)
+# JSON subset
+x = find(Dp[:,packages_rev["JSON"]])
+P = P[:,x]
+R = R[:,x]
+X1 = X1[x,x]
+X = copy(X1)
+D1 = D1[x,x]
+D = D[x,x]
+pv = [packages; versions[x]]
+
+# X = unsatisfiable_pairs(D, X1, P, R)
+G = [spzeros(Int, m, m) P; R' X]
+T = StrongModuleTree(G, digraph_factorizing_permutation(G))
+V = pv[T]
+
 # D1 .= max.(0, D1 .- X)
 # D .= max.(0, D .- X)
 

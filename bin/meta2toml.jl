@@ -346,15 +346,29 @@ end
 
 const pkg_map = package_map()
 const req_map = requires_map()
-const P = sparse(pkg_map, 1:n, 1, m, n)
-const R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
+
+P = sparse(pkg_map, 1:n, 1, m, n)
+R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
-const X1 = incompatibility_matrix()
-const D1 = max.(0, P'R .- X1)
-const D = iterate_dependencies(X1, P, R)
-const Dp = min.(1, D*P')
-const X = unsatisfiable_pairs(D, X1, P, R)
+X1 = incompatibility_matrix()
+D1 = max.(0, P'R .- X1)
+D = iterate_dependencies(X1, P, R)
+Dp = min.(1, D*P')
+X = X1
+
+# G :: 2^(m+n, m+n)
+# p, q ∈ 1:m     (packages)
+# v, w ∈ m+(1:n) (versions)
+# G[p, q] = 0 (no edges between packages)
+# G[p, v] = 1 ⟺ v is a version of p
+# G[v, p] = 1 ⟺ v requires p
+# G[v, w] = 1 ⟺ v and w are incompatible
+
+G = [spzeros(Int, m, m) P; R' X]
+pv = [packages; versions]
+
+# const X = unsatisfiable_pairs(D, X1, P, R)
 # D1 .= max.(0, D1 .- X)
 # D .= max.(0, D .- X)
 

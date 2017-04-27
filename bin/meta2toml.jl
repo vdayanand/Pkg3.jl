@@ -367,6 +367,8 @@ X = X1
 
 pv = [packages; versions]
 G = [spzeros(Int, m, m) P; R' X]
+T = StrongModuleTree(G, digraph_factorizing_permutation(G))
+V = pv[T]
 
 # JSON subset
 x = find(Dp[:,packages_rev["JSON"]])

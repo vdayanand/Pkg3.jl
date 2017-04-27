@@ -396,6 +396,29 @@ V = pv[T]
 
 include("graphutils.jl")
 
+function pkg_sat(G::AbstractMatrix, t::StrongModuleTree)
+    function linear_lt(X, Y)
+        x, y = first_leaf(X), first_leaf(Y)
+        return G[x,y] < G[y,x]
+    end
+
+    if t.kind == :complete && t.edge == (1,1)
+        return [pkg_sat(G, x) for x in t]
+    elseif t.kind == :complete && t.edge == (0,0)
+        return union((pkg_sat(G, x) for x in t)...)
+    elseif t.kind == :linear
+        z = Set()
+        for x in sort(t.nodes, lt=linear_lt)
+            append!(z, pkg_sat(G, x))
+        end
+        return z
+    end
+    error("unexpected node kind: $(kind_string(t))")
+end
+pkg_sat(G::AbstractMatrix, ind::Int) = pkg_sat(G, pv[ind])
+pkg_sat(G::AbstractMatrix, ver::Tuple{String,VersionNumber}) = [ver]
+pkg_sat(G::AbstractMatrix, pkg::String) = []
+
 ## Package info output routines ##
 
 function print_package_metadata(pkg::String, p::Package; julia=compat_julia(p))

@@ -282,8 +282,8 @@ edge_string(t::StrongModuleTree, post::String="") =
            t.kind == :complete ? "$(t.edge[1])$post" :
                                  "$(join(t.edge,"/"))$post"
 
-Base.summary(t::StrongModuleTree) =
-    "$(length(t))-node $(edge_string(t,"-"))$(t.kind) $(typeof(t))"
+kind_string(t::StrongModuleTree) = "$(edge_string(t,"-"))$(t.kind)"
+Base.summary(t::StrongModuleTree) = "$(length(t))-node $(kind_string(t)) $(typeof(t))"
 
 function Base.show(io::IO, t::StrongModuleTree)
     if get(io, :compact, false)

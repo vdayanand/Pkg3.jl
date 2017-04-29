@@ -301,11 +301,12 @@ end
 
 function incompatibility_matrix()
     X = spzeros(Int, n, n)
-    for (i, (p1, v1)) in enumerate(versions),
-        (j, (p2, v2)) in enumerate(versions)
+    for (i, (p1, v1)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
-        if haskey(r, p2) && v2 ∉ r[p2].versions
-            X[i,j] = X[j,i] = 1
+        for (j, (p2, v2)) in enumerate(versions)
+            if haskey(r, p2) && v2 ∉ r[p2].versions
+                X[i,j] = X[j,i] = 1
+            end
         end
     end
     return X

@@ -272,6 +272,7 @@ end
 const dir = length(ARGS) >= 1 ? ARGS[1] : Pkg.dir("METADATA")
 const pkgs = load_packages(dir)
 prune!(pkgs)
+
 const versions = [(pkg, ver) for (pkg, p) in pkgs for (ver, v) in p.versions]
 sort!(versions, by=last)
 sort!(versions, by=lowercase∘first)
@@ -299,6 +300,14 @@ function requires_map()
                      for (pkg, ver) in versions]
 end
 
+function package_versions()
+    vers = [Int[] for _ = 1:m]
+    for v in 1:n
+        push!(vers[pkg_map[v]], v)
+    end
+    return vers
+end
+
 function incompatibility_matrix()
     X = spzeros(Int, n, n)
     for (i, (p1, v1)) in enumerate(versions)
@@ -324,29 +333,40 @@ function iterate_dependencies(X, P, R; verbose=false)
     return D
 end
 
-function unsatisfiable_pairs(D, X1, R, P)
-    n = checksquare(D)
-    @assert n == checksquare(X1)
-    S = zeros(Bool, n, n)
-    for i = 1:n
-        println(i)
-        for j = 1:n
-            X1[i,j] == 0 || continue # skip directly incompatible pairs
-            S[i,j] == 0 || continue # skip discovered compatible pairs
-            v = SparseVector(n, [i, j], [1, 1])
-            d = max.(0, min.(1, D*v) .- X1*v)
-            all(min.(1, R*d) .<= min.(1, P*d)) || continue
-            @assert iszero(d'X1*d) # FAILS
-            c = find(d)
-            S[c,c] = 1
-        end
-    end
-    S .= .!S # negate bools
-    sparse(findn(S)..., 1, n, n)
-end
-
 const pkg_map = package_map()
 const req_map = requires_map()
+const pkg_vers = package_versions()
+
+function propagate_requires!(req_map)
+    # v: a package version
+    # req: a required package of v
+    # r: a version of req
+    # req_req: a requirement of r
+    # req_reqs: count requirements of r
+    req_reqs = Vector{Int}(m)
+    while true
+        clean = true
+        for v = 1:n
+            for req in req_map[v]
+                req_reqs .= 0
+                for r in pkg_vers[req]
+                    for req_req in req_map[r]
+                        req_reqs[req_req] += 1
+                    end
+                end
+                l = length(pkg_vers[req])
+                for req_req in find(c->c == l, req_reqs)
+                    if !(req_req in req_map[v])
+                        push!(req_map[v], req_req)
+                        clean = false
+                    end
+                end
+            end
+        end
+        clean && break
+    end
+    foreach(sort!, req_map)
+end
 
 P = sparse(pkg_map, 1:n, 1, m, n)
 R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
@@ -396,29 +416,6 @@ V = pv[T]
 # @assert max.(0, G .- G') == D1
 
 include("graphutils.jl")
-
-function pkg_sat(G::AbstractMatrix, t::StrongModuleTree)
-    function linear_lt(X, Y)
-        x, y = first_leaf(X), first_leaf(Y)
-        return G[x,y] < G[y,x]
-    end
-
-    if t.kind == :complete && t.edge == (1,1)
-        return [pkg_sat(G, x) for x in t]
-    elseif t.kind == :complete && t.edge == (0,0)
-        return union((pkg_sat(G, x) for x in t)...)
-    elseif t.kind == :linear
-        z = Set()
-        for x in sort(t.nodes, lt=linear_lt)
-            append!(z, pkg_sat(G, x))
-        end
-        return z
-    end
-    error("unexpected node kind: $(kind_string(t))")
-end
-pkg_sat(G::AbstractMatrix, ind::Int) = pkg_sat(G, pv[ind])
-pkg_sat(G::AbstractMatrix, ver::Tuple{String,VersionNumber}) = [ver]
-pkg_sat(G::AbstractMatrix, pkg::String) = []
 
 ## Package info output routines ##
 

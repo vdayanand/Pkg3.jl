@@ -367,6 +367,32 @@ function propagate_requires!(req_map)
     end
     foreach(sort!, req_map)
 end
+propagate_requires!(req_map)
+
+function propagate_conflicts!(X)
+    # v: a package version
+    # req: a required package of v
+    # r: a version of req
+    while true
+        clean = true
+        for v = 1:n
+            println(versions[v])
+            for req in req_map[v]
+                conflicts = spzeros(Int, n)
+                for r in pkg_vers[req]
+                    conflicts += X[:,r]
+                end
+                l = length(pkg_vers[req])
+                x = find(c->c == l, conflicts)
+                if any(X[x,v] .== 0)
+                    clean = false
+                    X[x,v] = 0
+                end
+            end
+        end
+        clean && break
+    end
+end
 
 P = sparse(pkg_map, 1:n, 1, m, n)
 R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]

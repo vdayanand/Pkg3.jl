@@ -413,6 +413,8 @@ R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
 X1 = incompatibility_matrix()
+propagate_conflicts!(X1)
+
 D1 = max.(0, P'R .- X1)
 D = iterate_dependencies(X1, P, R)
 Dp = min.(1, D*P')

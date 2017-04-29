@@ -300,6 +300,16 @@ function requires_map()
                      for (pkg, ver) in versions]
 end
 
+function requires_reverse_map()
+    rev = [Int[] for _ = 1:m]
+    for v in 1:n
+        for req in req_map[v]
+            push!(rev[req], v)
+        end
+    end
+    return rev
+end
+
 function package_versions()
     vers = [Int[] for _ = 1:m]
     for v in 1:n
@@ -335,6 +345,7 @@ end
 
 const pkg_map = package_map()
 const req_map = requires_map()
+const req_rev =  requires_reverse_map()
 const pkg_vers = package_versions()
 
 function propagate_requires!(req_map)
@@ -373,9 +384,12 @@ function propagate_conflicts!(X)
     # v: a package version
     # req: a required package of v
     # r: a version of req
-    while true
-        clean = true
-        for v = 1:n
+    dirty = collect(1:n)
+    while !isempty(dirty)
+        vers = sort(dirty)
+        println("DIRTY: ", length(vers))
+        empty!(dirty)
+        for v in vers
             println(versions[v])
             for req in req_map[v]
                 conflicts = spzeros(Int, n)
@@ -385,12 +399,12 @@ function propagate_conflicts!(X)
                 l = length(pkg_vers[req])
                 x = find(c->c == l, conflicts)
                 if any(X[x,v] .== 0)
-                    clean = false
                     X[x,v] = 0
+                    p = pkg_map[v]
+                    append!(dirty, req_rev[p] \ dirty)
                 end
             end
         end
-        clean && break
     end
 end
 

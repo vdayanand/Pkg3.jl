@@ -399,7 +399,7 @@ function propagate_conflicts!(X)
                 l = length(pkg_vers[req])
                 x = find(c->c == l, conflicts)
                 if any(X[x,v] .== 0)
-                    X[x,v] = 0
+                    X[x,v] = 1
                     p = pkg_map[v]
                     append!(dirty, req_rev[p] \ dirty)
                 end

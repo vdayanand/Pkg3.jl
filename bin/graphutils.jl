@@ -38,6 +38,8 @@ G = G2[invperm(p),invperm(p)]
 
 const \ = setdiff
 
+subgraph(G::AbstractMatrix, x::AbstractVector{Int}) = G[x,x]
+
 function BronKerboschTomita(emit, G, R, P, X)
 
     N(G, v) = find(G[:, v])

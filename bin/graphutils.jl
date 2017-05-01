@@ -474,6 +474,15 @@ function StrongModuleTree(G::AbstractMatrix, p::Vector{Int})
     return StrongModuleTree(G, p, op, cl)
 end
 
+function StrongModuleTree(G::AbstractMatrix{<:Integer})
+    a, b = extrema(G)
+    a <= 0 <= 1 <= b || error("factoring multi-color two-structures not supported")
+    p = (G == G') ?
+        graph_factorizing_permutation(G) :
+        digraph_factorizing_permutation(G)
+    StrongModuleTree(G, p)
+end
+
 false &&
 for _ = 1:100
     # global n, G, p, T, p′, T′

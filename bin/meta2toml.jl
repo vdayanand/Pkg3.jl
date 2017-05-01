@@ -430,14 +430,25 @@ include("graphutils.jl")
 # G[v, p] = 1 ⟺ v requires p
 # G[v, w] = 1 ⟺ v and w are incompatible
 
-pv = [packages; versions]
+function sorttree!(T::StrongModuleTree{Int})
+    sort!(T, by=first_leaf)
+    sort!(T, by=leaf_count)
+    sort!(T, by=node_count)
+    return T
+end
+
+TX = sorttree!(StrongModuleTree(X))
+VX = versions[TX]
+
+TD1 = sorttree!(StrongModuleTree(D1))
+VD1 = versions[TD1]
+
+TD = sorttree!(StrongModuleTree(D))
+VD = versions[TD]
+
 G = [spzeros(Int, m, m) P; R' X]
-# T = StrongModuleTree(G, digraph_factorizing_permutation(G))
-T = StrongModuleTree(X, graph_factorizing_permutation(X))
-sort!(T, by=first_leaf)
-sort!(T, by=leaf_count)
-sort!(T, by=node_count)
-V = pv[T]
+TG = sorttree!(StrongModuleTree(G))
+VG = [packages; versions][TG]
 
 #=
 # JSON subset

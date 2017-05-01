@@ -450,6 +450,10 @@ G = [spzeros(Int, m, m) P; R' X]
 TG = sorttree!(StrongModuleTree(G))
 VG = [packages; versions][TG]
 
+H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
+TH = sorttree!(StrongModuleTree(H))
+VH = [packages; versions][TH]
+
 #=
 # JSON subset
 x = find(Dp[:,packages_rev["JSON"]])

@@ -477,7 +477,7 @@ end
 function StrongModuleTree(G::AbstractMatrix{<:Integer})
     a, b = extrema(G)
     a <= 0 <= 1 <= b || error("factoring multi-color two-structures not supported")
-    p = (G == G') ?
+    p = issymmetric(G) ?
         graph_factorizing_permutation(G) :
         digraph_factorizing_permutation(G)
     StrongModuleTree(G, p)

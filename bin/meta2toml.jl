@@ -401,7 +401,7 @@ function propagate_conflicts!(X)
                 if any(X[x,v] .== 0)
                     X[x,v] = 1
                     p = pkg_map[v]
-                    append!(dirty, req_rev[p] \ dirty)
+                    append!(dirty, setdiff(req_rev[p], dirty))
                 end
             end
         end
@@ -420,6 +420,8 @@ D = iterate_dependencies(X1, P, R)
 Dp = min.(1, D*P')
 X = X1
 
+include("graphutils.jl")
+
 # G :: 2^(m+n, m+n)
 # p, q ∈ 1:m     (packages)
 # v, w ∈ m+(1:n) (versions)
@@ -433,6 +435,7 @@ G = [spzeros(Int, m, m) P; R' X]
 T = StrongModuleTree(G, digraph_factorizing_permutation(G))
 V = pv[T]
 
+#=
 # JSON subset
 x = find(Dp[:,packages_rev["JSON"]])
 P = P[:,x]
@@ -456,8 +459,7 @@ V = pv[T]
 # const G = D1 + X
 # @assert G .& G' == X
 # @assert max.(0, G .- G') == D1
-
-include("graphutils.jl")
+=#
 
 ## Package info output routines ##
 

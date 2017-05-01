@@ -433,6 +433,9 @@ include("graphutils.jl")
 pv = [packages; versions]
 G = [spzeros(Int, m, m) P; R' X]
 T = StrongModuleTree(G, digraph_factorizing_permutation(G))
+sort!(T, by=first_leaf)
+sort!(T, by=leaf_count)
+sort!(T, by=node_count)
 V = pv[T]
 
 #=

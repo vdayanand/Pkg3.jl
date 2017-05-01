@@ -454,21 +454,26 @@ H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
 TH = sorttree!(StrongModuleTree(H))
 VH = [packages; versions][TH]
 
-#=
-# JSON subset
-x = find(Dp[:,packages_rev["JSON"]])
-P = P[:,x]
-R = R[:,x]
-X1 = X1[x,x]
-X = copy(X1)
-D1 = D1[x,x]
-D = D[x,x]
-pv = [packages; versions[x]]
+if false
+    x = find(Dp[:,packages_rev["Libz"]])
+    y = find(sum(P[:,x],2))
+    Px = P[y,x]
+    Rx = R[y,x]
+    X1x = X1[x,x]
+    D1x = D1[x,x]
+    Dx = D[x,x]
+    pyvx = [packages[y]; versions[x]]
 
-# X = unsatisfiable_pairs(D, X1, P, R)
-G = [spzeros(Int, m, m) P; R' X]
-T = StrongModuleTree(G, digraph_factorizing_permutation(G))
-V = pv[T]
+    Xx = ones(Int, length(x), length(x))
+    for mis in maximal_indepedent_sets(X1, x)
+        z = findin(mis, x)
+        Xx[z,z] = 0
+    end
+
+    Gx = [spzeros(Int, length(y), length(y)) Px; Rx' Xx]
+    TG = sorttree!(StrongModuleTree(Gx))
+    VG = pyvx[TG]
+end
 
 # D1 .= max.(0, D1 .- X)
 # D .= max.(0, D .- X)
@@ -478,7 +483,6 @@ V = pv[T]
 # const G = D1 + X
 # @assert G .& G' == X
 # @assert max.(0, G .- G') == D1
-=#
 
 ## Package info output routines ##
 

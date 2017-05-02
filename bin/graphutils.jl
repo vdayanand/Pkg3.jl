@@ -66,7 +66,6 @@ function all_subsets(values::Vector)
 end
 
 function BronKerboschTomita(emit, G, R, P, X)
-
     N(G, v) = find(G[:, v])
 
     let available = unique(pkg_map[v] for V in (R, P) for v in V)
@@ -81,21 +80,12 @@ function BronKerboschTomita(emit, G, R, P, X)
             end
         end
     end
-    @show length(R), length(P), length(X)
 
-    # recursion base case
+    # base case
     isempty(P) && isempty(X) && return emit(R) != :break
 
-    # pivot: u in P ∪ X minimizing P ∩ N(G, u)
-    u, m = 0, typemax(Int)
-    for V in (P, X), v in V
-        n = sum(G[P, v])
-        n < m && ((u, m) = (v, n))
-    end
-    @assert u != 0
-
     # recursion
-    for v in P ∩ N(G, u)
+    for v in copy(P)
         Nv = N(G, v)
         BronKerboschTomita(emit, G, [R; v], P \ Nv, X \ Nv) || return false
         filter!(x -> x != v, P)
@@ -120,15 +110,30 @@ maximal_indepedent_sets(path::String, G::AbstractMatrix, inds::Vector{Int}=colle
 maximal_indepedent_sets(G::AbstractMatrix, inds::Vector{Int} = collect(1:size(G,2))) =
     maximal_indepedent_sets(STDOUT, G, inds)
 
-function find_independent_set(G::AbstractMatrix, R::Vector{Int}, inds::Vector{Int}=collect(1:size(G,2)))
+function find_independent_set(G::AbstractMatrix, R::Vector{Int})
     found = Int[]
+    n = checksquare(G)
     G = min.(1, G + I) # make each node its own neighbor
-    BronKerboschTomita(G, R, inds \ R, Int[]) do R
-        iszero(G[R,R] - I) || return :continue
-        found = sort!(R)
+    P = (1:n)\find(sum(G[R,:],1))
+    BronKerboschTomita(G, R, P, Int[]) do x
+        found = sort!(x)
         return :break
     end
     return found
+end
+
+function satisfiable_pairs(G::AbstractMatrix)
+    n = checksquare(G)
+    G = min.(1, G + I) # make each node its own neighbor
+    S = zeros(Int, n, n)
+    for i = 1:n, j = 1:n
+        G[i,j] != 0 && continue
+        S[i,j] != 0 && continue
+        @show i, j
+        x = find_independent_set(G, [i, j])
+        S[x,x] = 1
+    end
+    return S
 end
 
 function is_satisfied(V::Vector{Int})

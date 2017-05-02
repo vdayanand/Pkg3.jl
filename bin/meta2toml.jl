@@ -399,9 +399,8 @@ function propagate_conflicts!(X)
                 l = length(pkg_vers[req])
                 x = find(c->c == l, conflicts)
                 if any(X[x,v] .== 0)
-                    X[x,v] = 1
-                    p = pkg_map[v]
-                    append!(dirty, setdiff(req_rev[p], dirty))
+                    X[x,v] = X[v,x] = 1
+                    append!(dirty, setdiff(req_rev[pkg_map[v]], dirty))
                 end
             end
         end
@@ -414,6 +413,7 @@ R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
 end
 X1 = incompatibility_matrix()
 propagate_conflicts!(X1)
+@assert issymmetric(X1)
 
 D1 = max.(0, P'R .- X1)
 D = iterate_dependencies(X1, P, R)
@@ -437,24 +437,26 @@ function sorttree!(T::StrongModuleTree{Int})
     return T
 end
 
-# TX = sorttree!(StrongModuleTree(X))
-# VX = versions[TX]
+if false
+    TX = sorttree!(StrongModuleTree(X))
+    VX = versions[TX]
 
-# TD1 = sorttree!(StrongModuleTree(D1))
-# VD1 = versions[TD1]
+    TD1 = sorttree!(StrongModuleTree(D1))
+    VD1 = versions[TD1]
 
-# TD = sorttree!(StrongModuleTree(D))
-# VD = versions[TD]
+    TD = sorttree!(StrongModuleTree(D))
+    VD = versions[TD]
 
-# G = [spzeros(Int, m, m) P; R' X]
-# TG = sorttree!(StrongModuleTree(G))
-# VG = [packages; versions][TG]
+    G = [spzeros(Int, m, m) P; R' X]
+    TG = sorttree!(StrongModuleTree(G))
+    VG = [packages; versions][TG]
 
-# H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
-# TH = sorttree!(StrongModuleTree(H))
-# VH = [packages; versions][TH]
+    H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
+    TH = sorttree!(StrongModuleTree(H))
+    VH = [packages; versions][TH]
+end
 
-if true
+if false
     x = find(Dp[:,packages_rev["Colors"]])
     y = find(sum(P[:,x],2))
     Px = P[y,x]

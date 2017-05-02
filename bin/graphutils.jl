@@ -80,12 +80,21 @@ function BronKerboschTomita(emit, G, R, P, X)
             end
         end
     end
+    @show length(R), length(P), length(X)
 
     # base case
     isempty(P) && isempty(X) && return emit(R) != :break
 
+    # pivot: u in P ∪ X minimizing P ∩ N(G, u)
+    u, m = 0, typemax(Int)
+    for V in (P, X), v in V
+        n = sum(G[P, v])
+        n < m && ((u, m) = (v, n))
+    end
+    @assert u != 0
+
     # recursion
-    for v in copy(P)
+    for v in P ∩ N(G, u)
         Nv = N(G, v)
         BronKerboschTomita(emit, G, [R; v], P \ Nv, X \ Nv) || return false
         filter!(x -> x != v, P)

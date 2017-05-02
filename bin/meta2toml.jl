@@ -437,24 +437,24 @@ function sorttree!(T::StrongModuleTree{Int})
     return T
 end
 
-TX = sorttree!(StrongModuleTree(X))
-VX = versions[TX]
+# TX = sorttree!(StrongModuleTree(X))
+# VX = versions[TX]
 
-TD1 = sorttree!(StrongModuleTree(D1))
-VD1 = versions[TD1]
+# TD1 = sorttree!(StrongModuleTree(D1))
+# VD1 = versions[TD1]
 
-TD = sorttree!(StrongModuleTree(D))
-VD = versions[TD]
+# TD = sorttree!(StrongModuleTree(D))
+# VD = versions[TD]
 
-G = [spzeros(Int, m, m) P; R' X]
-TG = sorttree!(StrongModuleTree(G))
-VG = [packages; versions][TG]
+# G = [spzeros(Int, m, m) P; R' X]
+# TG = sorttree!(StrongModuleTree(G))
+# VG = [packages; versions][TG]
 
-H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
-TH = sorttree!(StrongModuleTree(H))
-VH = [packages; versions][TH]
+# H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
+# TH = sorttree!(StrongModuleTree(H))
+# VH = [packages; versions][TH]
 
-if false
+if true
     x = find(Dp[:,packages_rev["Colors"]])
     y = find(sum(P[:,x],2))
     Px = P[y,x]

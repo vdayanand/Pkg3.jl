@@ -40,6 +40,31 @@ const \ = setdiff
 
 subgraph(G::AbstractMatrix, x::AbstractVector{Int}) = G[x,x]
 
+function all_subsets(emit::Function, opt::Vector{T}, inc::Vector{T}=T[]) where T
+    if isempty(opt)
+        emit(inc)
+    else
+        x = pop!(opt)
+        all_subsets(emit, opt, inc)
+        push!(inc, x)
+        # - exclude all nodes conflicting with x
+        # - exclude nodes that can't be satisfied without those
+        all_subsets(emit, opt, inc)
+        pop!(inc)
+        # - exclude nodes that can't be satisfied without x
+        push!(opt, x)
+    end
+    return
+end
+
+function all_subsets(values::Vector)
+    all_subsets(copy(values)) do subset
+        print("[")
+        join(STDOUT, subset, ", ")
+        println("]")
+    end
+end
+
 function BronKerboschTomita(emit, G, R, P, X)
 
     N(G, v) = find(G[:, v])

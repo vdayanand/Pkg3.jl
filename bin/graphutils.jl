@@ -86,12 +86,13 @@ function BronKerboschTomita(emit, G, R, P, X)
     isempty(P) && isempty(X) && return emit(R) != :break
 
     # pivot: u in P ∪ X minimizing P ∩ N(G, u)
-    u, m = 0, typemax(Int)
-    for V in (P, X), v in V
-        n = sum(G[P, v])
-        n < m && ((u, m) = (v, n))
-    end
-    @assert u != 0
+    # u, m = 0, typemax(Int)
+    # for V in (P, X), v in V
+    #     n = sum(G[P, v])
+    #     n < m && ((u, m) = (v, n))
+    # end
+    # @assert u != 0
+    u = !isempty(P) ? first(P) : first(X)
 
     # recursion
     for v in P ∩ N(G, u)

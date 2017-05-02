@@ -455,13 +455,11 @@ TH = sorttree!(StrongModuleTree(H))
 VH = [packages; versions][TH]
 
 if false
-    x = find(Dp[:,packages_rev["Libz"]])
+    x = find(Dp[:,packages_rev["Colors"]])
     y = find(sum(P[:,x],2))
     Px = P[y,x]
     Rx = R[y,x]
     X1x = X1[x,x]
-    D1x = D1[x,x]
-    Dx = D[x,x]
     pyvx = [packages[y]; versions[x]]
 
     Xx = ones(Int, length(x), length(x))
@@ -469,6 +467,7 @@ if false
         z = findin(mis, x)
         Xx[z,z] = 0
     end
+    D1x = max.(0, Px'Rx .- Xx)
 
     Gx = [spzeros(Int, length(y), length(y)) Px; Rx' Xx]
     TG = sorttree!(StrongModuleTree(Gx))

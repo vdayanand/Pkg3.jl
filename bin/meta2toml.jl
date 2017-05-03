@@ -363,12 +363,24 @@ function pairwise_satisfiability(X::AbstractMatrix)
     for i = 1:n-1, j = i+1:n
         X[i,j] == 0 || continue
         S[i,j] == 0 || continue
+        @show i, j
         vers = [i, j]
         reqs = sort!(req_map[i] ∪ req_map[j]) \ [pkg_map[i], pkg_map[j]]
         satisfiable!(X, vers, reqs) || continue
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
-        # expand the set and mark all pairs
+        absent = (1:m)\(pkg_map[k] for k in vers)
+        satisfied = find(iszero, sum(R[absent,:],1))\vers
+        compsat = satisfied[find(iszero, sum(X[vers,satisfied],1))]
+        sums = sum(S[:,vers], 2)
+        sort!(compsat, by = k -> sums[k])
+        for k in compsat
+            iszero(X[vers,k]) && push!(vers, k)
+        end
+        sort!(vers)
+        @assert iszero(X[vers, vers])
+        @assert is_satisfied(vers)
+        S[vers,vers] = 1
     end
     return S
 end

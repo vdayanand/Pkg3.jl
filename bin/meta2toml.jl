@@ -311,11 +311,14 @@ function requires_reverse_map()
 end
 
 function package_versions()
-    vers = [Int[] for _ = 1:m]
+    los = zeros(Int, m)
+    his = zeros(Int, m)
     for v in 1:n
-        push!(vers[pkg_map[v]], v)
+        p = pkg_map[v]
+        los[p] == 0 && (los[p] = v)
+        his[p] = v
     end
-    return vers
+    [lo:hi for (lo,hi) in zip(los,his)]
 end
 
 function incompatibility_matrix()

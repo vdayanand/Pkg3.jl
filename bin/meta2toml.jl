@@ -365,7 +365,7 @@ function pairwise_satisfiability(X::AbstractMatrix)
         S[i,j] == 0 || continue
         @show i, j
         vers = [i, j]
-        reqs = sort!(req_map[i] ∪ req_map[j]) \ [pkg_map[i], pkg_map[j]]
+        reqs = req_map[i] ∪ req_map[j]
         satisfiable!(X, vers, reqs) || continue
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
@@ -386,20 +386,13 @@ function pairwise_satisfiability(X::AbstractMatrix)
 end
 
 function satisfiable!(X::AbstractMatrix, vers::Vector{Int}, reqs::Vector{Int})
-    len = length(reqs)
-    if len == 0
-        sort!(vers)
-        return true
-    end
-    for v in pkg_vers[shift!(reqs)]
+    provided = unique(pkg_map[x] for x in vers)
+    filter!(r->!(r in provided), reqs)
+    isempty(reqs) && return true
+    for v in pkg_vers[first(reqs)]
         iszero(X[vers,v]) || continue
         push!(vers, v)
-        pkgs = unique(pkg_map[x] for x in vers)
-        for r in req_map[v]
-            r in pkgs || push!(reqs, r)
-        end
-        satisfiable!(X, vers, reqs) && return true
-        resize!(reqs, len - 1)
+        satisfiable!(X, vers, reqs ∪ req_map[v]) && return true
         pop!(vers)
     end
     return false

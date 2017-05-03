@@ -357,16 +357,33 @@ function is_satisfied(vers::Vector{Int})
     required ⊆ provided
 end
 
+function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
+    for (pkg, vers) in enumerate(pkg_vers)
+        push!(cnf, [-(n+pkg); vers])
+    end
+    for (ver, reqs) in enumerate(req_map), req in reqs
+        push!(cnf, [-ver, n+req])
+    end
+    for (v1, v2) in zip(findn(X)...)
+        push!(cnf, [-v1, -v2])
+    end
+    return cnf
+end
+build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
+
+using PicoSAT
+
 function pairwise_satisfiability(X::AbstractMatrix)
     n = checksquare(X)
     S = zeros(Bool, n, n)
+    cnf = build_cnf!(X, [[0], [0]])
     for i = 1:n-1, j = i+1:n
         X[i,j] == 0 || continue
         S[i,j] == 0 || continue
-        @show i, j
-        vers = [i, j]
-        reqs = req_map[i] ∪ req_map[j]
-        satisfiable!(X, vers, reqs) || continue
+        cnf[1][1], cnf[2][1] = @show i, j
+        sat = PicoSAT.solve(cnf)
+        sat == :unsatisfiable && continue
+        vers = filter(x -> 1 <= x <= n, sat::Vector{Int})
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
         absent = (1:m)\(pkg_map[k] for k in vers)
@@ -428,7 +445,7 @@ function propagate_requires!(req_map)
     end
     foreach(sort!, req_map)
 end
-propagate_requires!(req_map)
+# propagate_requires!(req_map)
 
 function propagate_conflicts!(X)
     # v: a package version
@@ -462,7 +479,7 @@ R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
 X1 = incompatibility_matrix()
-propagate_conflicts!(X1)
+# propagate_conflicts!(X1)
 @assert issymmetric(X1)
 
 D1 = max.(0, P'R .- X1)

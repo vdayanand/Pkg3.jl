@@ -146,12 +146,6 @@ function satisfiable_pairs(G::AbstractMatrix)
     return S
 end
 
-function is_satisfied(V::Vector{Int})
-    provided = unique(pkg_map[v] for v in V)
-    required = unique(r for v in V for r in req_map[v])
-    required ⊆ provided
-end
-
 function is_maximal(G::AbstractMatrix, V::Vector{Int}, inds::Vector{Int} = 1:n)
     minimum(sum(G[V, inds\V], 1)) > 0
 end

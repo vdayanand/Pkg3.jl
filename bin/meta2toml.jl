@@ -351,6 +351,48 @@ const req_map = requires_map()
 const req_rev =  requires_reverse_map()
 const pkg_vers = package_versions()
 
+function is_satisfied(vers::Vector{Int})
+    provided = unique(pkg_map[v] for v in vers)
+    required = unique(r for v in vers for r in req_map[v])
+    required ⊆ provided
+end
+
+function pairwise_satisfiability(X::AbstractMatrix)
+    n = checksquare(X)
+    S = zeros(Bool, n, n)
+    for i = 1:n-1, j = i+1:n
+        X[i,j] == 0 || continue
+        S[i,j] == 0 || continue
+        vers = [i, j]
+        reqs = sort!(req_map[i] ∪ req_map[j]) \ [pkg_map[i], pkg_map[j]]
+        satisfiable!(X, vers, reqs) || continue
+        @assert iszero(X[vers, vers])
+        @assert is_satisfied(vers)
+        # expand the set and mark all pairs
+    end
+    return S
+end
+
+function satisfiable!(X::AbstractMatrix, vers::Vector{Int}, reqs::Vector{Int})
+    len = length(reqs)
+    if len == 0
+        sort!(vers)
+        return true
+    end
+    for v in pkg_vers[shift!(reqs)]
+        iszero(X[vers,v]) || continue
+        push!(vers, v)
+        pkgs = unique(pkg_map[x] for x in vers)
+        for r in req_map[v]
+            r in pkgs || push!(reqs, r)
+        end
+        satisfiable!(X, vers, reqs) && return true
+        resize!(reqs, len - 1)
+        pop!(vers)
+    end
+    return false
+end
+
 function propagate_requires!(req_map)
     # v: a package version
     # req: a required package of v

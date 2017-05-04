@@ -382,6 +382,9 @@ end
 function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
     for (pkg, vers) in enumerate(pkg_vers)
         push!(cnf, [-(n+pkg); vers])
+        for ver in vers
+            push!(cnf, [-ver, n+pkg])
+        end
     end
     for (ver, reqs) in enumerate(req_map), req in reqs
         push!(cnf, [-ver, n+req])
@@ -394,6 +397,28 @@ end
 build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
 
 using PicoSAT
+
+function deep_requirements!(req_map, P = Main.P, R = Main.R, X = Main.X)
+    D = min.(1, P'R)
+    while true
+        D′ = min.(1, D^2)
+        D′ == D && break
+        D = D′
+    end
+    cnf = build_cnf!(X, [[0], [0]])
+    for (r, v) in zip(findn(P*D)...)
+        pkg_map[v] == r && continue
+        r in req_map[v] && continue
+        cnf[1][1], cnf[2][1] = v, -r
+        println((v, r, versions[v], packages[r]))
+        sat = PicoSAT.solve(cnf)
+        sat != :unsatisfiable && continue
+        println("REQ")
+        push!(req_map[v], r)
+    end
+    foreach(sort!, req_map)
+    return req_map
+end
 
 function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)
     n = checksquare(X)

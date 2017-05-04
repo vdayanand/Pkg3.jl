@@ -431,19 +431,6 @@ function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)
     return S
 end
 
-function satisfiable!(X::AbstractMatrix, vers::Vector{Int}, reqs::Vector{Int})
-    provided = unique(pkg_map[x] for x in vers)
-    filter!(r->!(r in provided), reqs)
-    isempty(reqs) && return true
-    for v in pkg_vers[first(reqs)]
-        iszero(X[vers,v]) || continue
-        push!(vers, v)
-        satisfiable!(X, vers, reqs ∪ req_map[v]) && return true
-        pop!(vers)
-    end
-    return false
-end
-
 function propagate_requires!(req_map)
     # v: a package version
     # req: a required package of v
@@ -514,7 +501,10 @@ propagate_conflicts!(X1)
 D1 = max.(0, P'R .- X1)
 D = iterate_dependencies(X1, P, R)
 Dp = min.(1, D*P')
-X = X1
+
+# S = pairwise_satisfiability(X)
+S = open(deserialize, "tmp/S.jls")
+X = sparse(ind2sub(size(X1), find(iszero, S))..., 1)
 
 include("graphutils.jl")
 

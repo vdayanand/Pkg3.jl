@@ -498,13 +498,13 @@ X1 = incompatibility_matrix()
 propagate_conflicts!(X1)
 @assert issymmetric(X1)
 
-D1 = max.(0, P'R .- X1)
 D = iterate_dependencies(X1, P, R)
 Dp = min.(1, D*P')
 
 # S = pairwise_satisfiability(X)
 S = open(deserialize, "tmp/S.jls")
-X = sparse(ind2sub(size(X1), find(iszero, S))..., 1)
+X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
+D1 = max.(0, P'R .- X)
 
 include("graphutils.jl")
 
@@ -540,6 +540,10 @@ if false
     H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
     TH = sorttree!(StrongModuleTree(H))
     VH = [packages; versions][TH]
+
+    Y = X + D1
+    TY = sorttree!(StrongModuleTree(Y))
+    VY = versions[TY]
 end
 
 if false

@@ -431,37 +431,44 @@ function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)
     return S
 end
 
-function propagate_requires!(req_map)
+# if every compatible version of a requirement requires
+# something then make the top version require it too
+
+function propagate_requires!(req_map, X::AbstractMatrix = spzeros(Int,n,n))
     # v: a package version
     # req: a required package of v
     # r: a version of req
     # req_req: a requirement of r
     # req_reqs: count requirements of r
     req_reqs = Vector{Int}(m)
-    while true
-        clean = true
-        for v = 1:n
+    dirty = collect(1:n)
+    while !isempty(dirty)
+        vers = sort(dirty)
+        println("DIRTY: ", length(vers))
+        empty!(dirty)
+        for v in vers
+            println(versions[v])
             for req in req_map[v]
+                req_vers = filter(x->X[v,x] == 0, pkg_vers[req])
+                isempty(req_vers) && continue
                 req_reqs .= 0
-                for r in pkg_vers[req]
+                for r in req_vers
                     for req_req in req_map[r]
                         req_reqs[req_req] += 1
                     end
                 end
-                l = length(pkg_vers[req])
-                for req_req in find(c->c == l, req_reqs)
+                l = length(req_vers)
+                for req_req in find(c->c >= l, req_reqs)
                     if !(req_req in req_map[v])
                         push!(req_map[v], req_req)
-                        clean = false
+                        append!(dirty, setdiff(req_rev[pkg_map[v]], dirty))
                     end
                 end
             end
         end
-        clean && break
     end
     foreach(sort!, req_map)
 end
-propagate_requires!(req_map)
 
 function propagate_conflicts!(X)
     # v: a package version
@@ -495,6 +502,7 @@ R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
 X1 = incompatibility_matrix()
+propagate_requires!(req_map, X1)
 propagate_conflicts!(X1)
 @assert issymmetric(X1)
 
@@ -504,7 +512,13 @@ Dp = min.(1, D*P')
 # S = pairwise_satisfiability(X)
 S = open(deserialize, "tmp/S.jls")
 X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
+propagate_requires!(req_map, X)
+R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
+    sparse(first.(p), last.(p), 1, m, n)
+end
 D1 = max.(0, P'R .- X)
+D = iterate_dependencies(X1, P, R)
+Dp = min.(1, D*P')
 
 include("graphutils.jl")
 

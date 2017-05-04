@@ -373,31 +373,38 @@ build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
 
 using PicoSAT
 
-function pairwise_satisfiability(X::AbstractMatrix)
+function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)
     n = checksquare(X)
     S = zeros(Bool, n, n)
     cnf = build_cnf!(X, [[0], [0]])
-    for i = 1:n-1, j = i+1:n
+    p = sortperm(vec(sum(D, 1)), rev=true)
+    for a = 1:n-1, b = a+1:n
+        i, j = p[a], p[b]
         X[i,j] == 0 || continue
         S[i,j] == 0 || continue
-        cnf[1][1], cnf[2][1] = @show i, j
+        println((a, b, versions[i], versions[j]))
+        cnf[1][1], cnf[2][1] = i, j
         sat = PicoSAT.solve(cnf)
         sat == :unsatisfiable && continue
         vers = filter(x -> 1 <= x <= n, sat::Vector{Int})
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
-        absent = (1:m)\(pkg_map[k] for k in vers)
-        satisfied = find(iszero, sum(R[absent,:],1))\vers
-        compsat = satisfied[find(iszero, sum(X[vers,satisfied],1))]
-        sums = sum(S[:,vers], 2)
-        sort!(compsat, by = k -> sums[k])
-        for k in compsat
-            iszero(X[vers,k]) && push!(vers, k)
+        while true
+            absent = (1:m)\(pkg_map[k] for k in vers)
+            satisfied = find(iszero, sum(R[absent,:],1))\vers
+            compsat = satisfied[find(iszero, sum(X[vers,satisfied],1))]
+            isempty(compsat) && break
+            sums = sum(S[:,vers], 2)
+            sort!(compsat, by = k -> sums[k])
+            for k in compsat
+                iszero(X[vers,k]) && push!(vers, k)
+            end
         end
         sort!(vers)
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
         S[vers,vers] = 1
+        println("SAT: +", length(vers), ", ", 100*countnz(S)/length(S), "%")
     end
     return S
 end

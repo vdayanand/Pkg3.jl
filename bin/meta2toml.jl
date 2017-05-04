@@ -452,7 +452,7 @@ function propagate_requires!(req_map)
     end
     foreach(sort!, req_map)
 end
-# propagate_requires!(req_map)
+propagate_requires!(req_map)
 
 function propagate_conflicts!(X)
     # v: a package version
@@ -486,7 +486,7 @@ R = let p = [(i, j) for (j, v) in enumerate(req_map) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
 end
 X1 = incompatibility_matrix()
-# propagate_conflicts!(X1)
+propagate_conflicts!(X1)
 @assert issymmetric(X1)
 
 D1 = max.(0, P'R .- X1)

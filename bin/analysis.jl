@@ -12,23 +12,7 @@ function version_to_package()
     end
     return pkgs
 end
-
-function version_to_required_packages()
-    ind = Dict(p => i for (i, p) in enumerate(packages))
-    [sort!([ind[dep]
-        for dep in keys(pkgs[pkg].versions[ver].requires)])
-        for (pkg, ver) in versions]
-end
-
-function package_to_requiring_versions()
-    rev = [Int[] for _ = 1:m]
-    for v in 1:n
-        for req in ver_to_reqs[v]
-            push!(rev[req], v)
-        end
-    end
-    return rev
-end
+const ver_to_pkg = version_to_package()
 
 function package_to_version_range()
     los = zeros(Int, m)
@@ -40,24 +24,59 @@ function package_to_version_range()
     end
     [lo:hi for (lo,hi) in zip(los,his)]
 end
-
-const ver_to_pkg = version_to_package()
-const ver_to_reqs = version_to_required_packages()
-const pkg_to_reqd =  package_to_requiring_versions()
 const pkg_to_vers = package_to_version_range()
 
-function incompatibility_matrix()
-    X = spzeros(Int, n, n)
+function version_to_required_packages()
+    ind = Dict(p => i for (i, p) in enumerate(packages))
+    [sort!([ind[dep]
+        for dep in keys(pkgs[pkg].versions[ver].requires)])
+        for (pkg, ver) in versions]
+end
+const ver_to_reqs = version_to_required_packages()
+
+function package_to_requiring_versions()
+    rev = [Int[] for _ = 1:m]
+    for v in 1:n
+        for req in ver_to_reqs[v]
+            push!(rev[req], v)
+        end
+    end
+    return rev
+end
+const pkg_to_reqd =  package_to_requiring_versions()
+
+function direct_incompatibilities()
+    conflicts = [Int[] for _ = 1:n]
     for (i, (p1, v1)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
         for (j, (p2, v2)) in enumerate(versions)
             if haskey(r, p2) && v2 ∉ r[p2].versions
-                X[i,j] = X[j,i] = 1
+                push!(conflicts[i], j)
+                push!(conflicts[j], i)
             end
         end
     end
-    return X
+    foreach(sort!, conflicts)
+    return conflicts
 end
+const conflicts = direct_incompatibilities()
+
+function build_cnf!(cnf::Vector{Vector{Int}})
+    for (pkg, vers) in enumerate(pkg_to_vers)
+        push!(cnf, [-(n+pkg); vers])
+        for ver in vers
+            push!(cnf, [-ver, n+pkg])
+        end
+    end
+    for (ver, reqs) in enumerate(ver_to_reqs), req in reqs
+        push!(cnf, [-ver, n+req])
+    end
+    for (v1, v2s) in enumerate(conflicts), v2 in v2s
+        push!(cnf, [-v1, -v2])
+    end
+    return cnf
+end
+build_cnf() = build_cnf!(Vector{Int}[])
 
 function iterate_dependencies(X, P, R; verbose=false)
     X = max.(0, X - I) # make each node not its own neighbor
@@ -77,23 +96,6 @@ function is_satisfied(vers::Vector{Int})
     required ⊆ provided
 end
 
-function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
-    for (pkg, vers) in enumerate(pkg_to_vers)
-        push!(cnf, [-(n+pkg); vers])
-        for ver in vers
-            push!(cnf, [-ver, n+pkg])
-        end
-    end
-    for (ver, reqs) in enumerate(ver_to_reqs), req in reqs
-        push!(cnf, [-ver, n+req])
-    end
-    for (v1, v2) in zip(findn(X)...)
-        push!(cnf, [-v1, -v2])
-    end
-    return cnf
-end
-build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
-
 function deep_requirements!(ver_to_reqs, P = Main.P, R = Main.R, X = Main.X)
     D = min.(1, P'R)
     while true
@@ -107,8 +109,7 @@ function deep_requirements!(ver_to_reqs, P = Main.P, R = Main.R, X = Main.X)
         r in ver_to_reqs[v] && continue
         cnf[1][1], cnf[2][1] = v, -r
         println((v, r, versions[v], packages[r]))
-        sat = PicoSAT.solve(cnf)
-        sat != :unsatisfiable && continue
+        PicoSAT.solve(cnf) != :unsatisfiable && continue
         println("REQ")
         push!(ver_to_reqs[v], r)
     end

@@ -206,8 +206,8 @@ if !isfile("tmp/satisfiable.jls")
 else
     S = open(deserialize, "tmp/satisfiable.jls")
 end
-const X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
-const D = iterate_dependencies()
+# const X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
+# const D = iterate_dependencies()
 
 if false
 

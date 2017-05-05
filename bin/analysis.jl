@@ -204,9 +204,9 @@ if !isfile("tmp/satisfiable.jls")
         serialize(f, S)
     end
 else
-    const S = open(deserialize, "tmp/satisfiable.jls")
+    S = open(deserialize, "tmp/satisfiable.jls")
 end
-const X = sparse(ind_to_sub(size(S), find(iszero, S))..., 1)
+const X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
 const D = iterate_dependencies()
 
 if false
@@ -225,7 +225,7 @@ Dp = min.(1, D*P')
 
 # S = pairwise_satisfiability(X)
 S = open(deserialize, "tmp/S.jls")
-X = sparse(ind_to_sub(size(S), find(iszero, S))..., 1)
+X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
 propagate_requires!(ver_to_reqs, X)
 R = let p = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
     sparse(first.(p), last.(p), 1, m, n)

@@ -13,6 +13,8 @@ function version_to_package()
     return pkgs
 end
 const ver_to_pkg = version_to_package()
+const P = sparse(1:n, ver_to_pkg, 1, n, m)
+@assert all(x->x == 1, sum(P, 2))
 
 function package_to_version_range()
     los = zeros(Int, m)
@@ -33,6 +35,11 @@ function version_to_required_packages()
         for (pkg, ver) in versions]
 end
 const ver_to_reqs = version_to_required_packages()
+const R = let
+    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
+    sparse(first.(pairs), last.(pairs), 1, m, n)
+end
+@assert iszero(diag(R*P))
 
 function package_to_requiring_versions()
     rev = [Int[] for _ = 1:m]
@@ -45,21 +52,35 @@ function package_to_requiring_versions()
 end
 const pkg_to_reqd =  package_to_requiring_versions()
 
-function direct_incompatibilities()
-    conflicts = [Int[] for _ = 1:n]
+function incompatibility_matrix()
+    X = spzeros(Int, n, n)
     for (i, (p1, v1)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
         for (j, (p2, v2)) in enumerate(versions)
             if haskey(r, p2) && v2 ∉ r[p2].versions
-                push!(conflicts[i], j)
-                push!(conflicts[j], i)
+                X[i,j] = X[j,i] = 1
             end
         end
     end
-    foreach(sort!, conflicts)
-    return conflicts
+    return X
 end
-const conflicts = direct_incompatibilities()
+const X = incompatibility_matrix()
+@assert iszero(diag(X))
+@assert issymmetric(X)
+
+function iterate_dependencies(X)
+    X = max.(0, X - I) # make each node not its own neighbor
+    D = max.(0, min.(1, P*R + I) .- X)
+    for i = 1:typemax(Int)
+        n = nnz(D)
+        D .= max.(0, min.(1, D^2) .- X)
+        nnz(D) <= n && break
+    end
+    return D
+end
+const D = iterate_dependencies(X)
+@assert all(x->x == 1, diag(D))
+@assert iszero(D .& X)
 
 function build_cnf!(cnf::Vector{Vector{Int}})
     for (pkg, vers) in enumerate(pkg_to_vers)
@@ -71,40 +92,16 @@ function build_cnf!(cnf::Vector{Vector{Int}})
     for (ver, reqs) in enumerate(ver_to_reqs), req in reqs
         push!(cnf, [-ver, n+req])
     end
-    for (v1, v2s) in enumerate(conflicts), v2 in v2s
+    for (v1, v2) in zip(findn(X)...)
         push!(cnf, [-v1, -v2])
     end
     return cnf
 end
 build_cnf() = build_cnf!(Vector{Int}[])
 
-function iterate_dependencies(X, P, R; verbose=false)
-    X = max.(0, X - I) # make each node not its own neighbor
-    D = max.(0, min.(1, P'R + I) .- X)
-    for i = 1:typemax(Int)
-        n = nnz(D)
-        verbose && println("Density $i: $(n/length(D))")
-        D .= max.(0, min.(1, D^2) .- X)
-        nnz(D) <= n && break
-    end
-    return D
-end
-
-function is_satisfied(vers::Vector{Int})
-    provided = unique(ver_to_pkg[v] for v in vers)
-    required = unique(r for v in vers for r in ver_to_reqs[v])
-    required ⊆ provided
-end
-
-function deep_requirements!(ver_to_reqs, P = Main.P, R = Main.R, X = Main.X)
-    D = min.(1, P'R)
-    while true
-        D′ = min.(1, D^2)
-        D′ == D && break
-        D = D′
-    end
-    cnf = build_cnf!(X, [[0], [0]])
-    for (r, v) in zip(findn(P*D)...)
+function deep_requirements!(ver_to_reqs)
+    cnf = build_cnf!([[0], [0]])
+    for (r, v) in zip(findn(P'D)...)
         ver_to_pkg[v] == r && continue
         r in ver_to_reqs[v] && continue
         cnf[1][1], cnf[2][1] = v, -r
@@ -115,6 +112,12 @@ function deep_requirements!(ver_to_reqs, P = Main.P, R = Main.R, X = Main.X)
     end
     foreach(sort!, ver_to_reqs)
     return ver_to_reqs
+end
+
+function is_satisfied(vers::Vector{Int})
+    provided = unique(ver_to_pkg[v] for v in vers)
+    required = unique(r for v in vers for r in ver_to_reqs[v])
+    required ⊆ provided
 end
 
 function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)

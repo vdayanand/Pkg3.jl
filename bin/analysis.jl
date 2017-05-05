@@ -198,7 +198,19 @@ function pairwise_satisfiability()
     return S
 end
 
+if !isfile("tmp/satisfiable.jls")
+    S = pairwise_satisfiability()
+    open("tmp/satisfiable.jls", "w") do f
+        serialize(f, S)
+    end
+else
+    const S = open(deserialize, "tmp/satisfiable.jls")
+end
+const X = sparse(ind_to_sub(size(S), find(iszero, S))..., 1)
+const D = iterate_dependencies()
+
 if false
+
 P = sparse(ver_to_pkg, 1:n, 1, m, n)
 R = let p = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
     sparse(first.(p), last.(p), 1, m, n)
@@ -221,7 +233,6 @@ end
 D1 = max.(0, P'R .- X)
 D = iterate_dependencies(X1, P, R)
 Dp = min.(1, D*P')
-end
 
 include("graphutils.jl")
 
@@ -281,6 +292,8 @@ if false
     Gx = [spzeros(Int, length(y), length(y)) Px; Rx' Xx]
     TG = sorttree!(StrongModuleTree(Gx))
     VG = pyvx[TG]
+end
+
 end
 
 # D1 .= max.(0, D1 .- X)

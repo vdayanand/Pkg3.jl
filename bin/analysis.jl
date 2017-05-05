@@ -41,7 +41,7 @@ const ver_to_reqs = version_to_required_packages()
 function requirements_matrix()
     pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
     R = sparse(first.(pairs), last.(pairs), 1, m, n)
-    @assert iszero(diag(R*P))
+    @assert iszero(min.(P*R, P*P'))
     return R
 end
 const R = requirements_matrix()
@@ -74,14 +74,14 @@ end
 const X = incompatibility_matrix()
 
 function iterate_dependencies()
-    D = max.(0, min.(1, P*R + I) .- X)
+    Z = min.(1, X .+ P*P')
+    D = dropzeros!(max.(0, min.(1, P*R) .- Z))
     for i = 1:typemax(Int)
-        n = nnz(D)
-        D .= max.(0, min.(1, D^2) .- X)
-        nnz(D) <= n && break
+        n = countnz(D)
+        D .= dropzeros!(max.(0, min.(1, D .+ D^2) .- Z))
+        countnz(D) <= n && break
     end
-    @assert all(x->x == 1, diag(D))
-    @assert iszero(D .& X)
+    @assert iszero(min.(D, Z))
     return D
 end
 const D = iterate_dependencies()
@@ -118,9 +118,18 @@ function deep_requirements!()
     end
     foreach(sort!, ver_to_reqs)
 end
-deep_requirements!()
 
-function propagate_conflicts!()
+if !isfile("tmp/ver_to_reqs.jls")
+    deep_requirements!()
+    open("tmp/ver_to_reqs.jls", "w") do f
+        serialize(f, ver_to_reqs)
+    end
+else
+    const ver_to_reqs = open(deserialize, "tmp/ver_to_reqs.jls")
+end
+const R = requirements_matrix()
+
+function propagate_consistent_conflicts!()
     dirty = collect(1:n)
     while !isempty(dirty)
         vers = sort(dirty)
@@ -143,9 +152,8 @@ function propagate_conflicts!()
         end
     end
 end
-propagate_conflicts!()
+propagate_consistent_conflicts!()
 
-const R = requirements_matrix()
 const D = iterate_dependencies()
 
 function is_satisfied(vers::Vector{Int})
@@ -156,8 +164,8 @@ end
 
 function pairwise_satisfiability()
     n = checksquare(X)
-    S = zeros(Bool, n, n)
-    cnf = build_cnf!(X, [[0], [0]])
+    S = full(D'X*D) .== 0
+    cnf = build_cnf!([[0], [0]])
     p = sortperm(vec(sum(D, 1)), rev=true)
     for a = 1:n-1, b = a+1:n
         i, j = p[a], p[b]
@@ -171,13 +179,13 @@ function pairwise_satisfiability()
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
         while true
-            absent = (1:m)\(ver_to_pkg[k] for k in vers)
-            satisfied = find(iszero, sum(R[absent,:],1))\vers
-            compsat = satisfied[find(iszero, sum(X[vers,satisfied],1))]
-            isempty(compsat) && break
+            absent = setdiff(1:m, (ver_to_pkg[k] for k in vers))
+            satisfied = setdiff(find(iszero, sum(R[absent,:],1)), vers)
+            compatible = satisfied[find(iszero, sum(X[vers,satisfied],1))]
+            isempty(compatible) && break
             sums = sum(S[:,vers], 2)
-            sort!(compsat, by = k -> sums[k])
-            for k in compsat
+            sort!(compatible, by = k -> sums[k])
+            for k in compatible
                 iszero(X[vers,k]) && push!(vers, k)
             end
         end

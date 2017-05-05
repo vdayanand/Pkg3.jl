@@ -14,7 +14,9 @@ function version_to_package()
 end
 const ver_to_pkg = version_to_package()
 const P = sparse(1:n, ver_to_pkg, 1, n, m)
+
 @assert all(x->x == 1, sum(P, 2))
+@assert all(x->x >= 1, sum(P, 1))
 
 function package_to_version_range()
     los = zeros(Int, m)
@@ -35,11 +37,14 @@ function version_to_required_packages()
         for (pkg, ver) in versions]
 end
 const ver_to_reqs = version_to_required_packages()
-const R = let
+
+function requirements_matrix()
     pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
-    sparse(first.(pairs), last.(pairs), 1, m, n)
+    R = sparse(first.(pairs), last.(pairs), 1, m, n)
+    @assert iszero(diag(R*P))
+    return R
 end
-@assert iszero(diag(R*P))
+const R = requirements_matrix()
 
 function package_to_requiring_versions()
     rev = [Int[] for _ = 1:m]
@@ -62,25 +67,24 @@ function incompatibility_matrix()
             end
         end
     end
+    @assert iszero(diag(X))
+    @assert issymmetric(X)
     return X
 end
 const X = incompatibility_matrix()
-@assert iszero(diag(X))
-@assert issymmetric(X)
 
-function iterate_dependencies(X)
-    X = max.(0, X - I) # make each node not its own neighbor
+function iterate_dependencies()
     D = max.(0, min.(1, P*R + I) .- X)
     for i = 1:typemax(Int)
         n = nnz(D)
         D .= max.(0, min.(1, D^2) .- X)
         nnz(D) <= n && break
     end
+    @assert all(x->x == 1, diag(D))
+    @assert iszero(D .& X)
     return D
 end
-const D = iterate_dependencies(X)
-@assert all(x->x == 1, diag(D))
-@assert iszero(D .& X)
+const D = iterate_dependencies()
 
 function build_cnf!(cnf::Vector{Vector{Int}})
     for (pkg, vers) in enumerate(pkg_to_vers)
@@ -99,20 +103,50 @@ function build_cnf!(cnf::Vector{Vector{Int}})
 end
 build_cnf() = build_cnf!(Vector{Int}[])
 
-function deep_requirements!(ver_to_reqs)
+function deep_requirements!()
     cnf = build_cnf!([[0], [0]])
     for (r, v) in zip(findn(P'D)...)
         ver_to_pkg[v] == r && continue
         r in ver_to_reqs[v] && continue
         cnf[1][1], cnf[2][1] = v, -r
-        println((v, r, versions[v], packages[r]))
-        PicoSAT.solve(cnf) != :unsatisfiable && continue
-        println("REQ")
-        push!(ver_to_reqs[v], r)
+        print((v, r, versions[v], packages[r]), " ...")
+        if PicoSAT.solve(cnf) == :unsatisfiable
+            push!(ver_to_reqs[v], r)
+            print(" REQ")
+        end
+        println()
     end
     foreach(sort!, ver_to_reqs)
-    return ver_to_reqs
 end
+deep_requirements!()
+
+function propagate_conflicts!()
+    dirty = collect(1:n)
+    while !isempty(dirty)
+        vers = sort(dirty)
+        println("DIRTY: ", length(vers))
+        empty!(dirty)
+        for v in vers
+            println(versions[v])
+            for req in ver_to_reqs[v]
+                conflicts = spzeros(Int, n)
+                for r in pkg_to_vers[req]
+                    conflicts += X[:,r]
+                end
+                l = length(pkg_to_vers[req])
+                x = find(c->c == l, conflicts)
+                if any(X[x,v] .== 0)
+                    X[x,v] = X[v,x] = 1
+                    append!(dirty, setdiff(pkg_to_reqd[ver_to_pkg[v]], dirty))
+                end
+            end
+        end
+    end
+end
+propagate_conflicts!()
+
+const R = requirements_matrix()
+const D = iterate_dependencies()
 
 function is_satisfied(vers::Vector{Int})
     provided = unique(ver_to_pkg[v] for v in vers)
@@ -120,7 +154,7 @@ function is_satisfied(vers::Vector{Int})
     required ⊆ provided
 end
 
-function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)
+function pairwise_satisfiability()
     n = checksquare(X)
     S = zeros(Bool, n, n)
     cnf = build_cnf!(X, [[0], [0]])
@@ -154,72 +188,6 @@ function pairwise_satisfiability(X::AbstractMatrix, D::AbstractMatrix=Main.D)
         println("SAT: +", length(vers), ", ", 100*countnz(S)/length(S), "%")
     end
     return S
-end
-
-# if every compatible version of a requirement requires
-# something then make the top version require it too
-
-function propagate_requires!(ver_to_reqs, X::AbstractMatrix = spzeros(Int,n,n))
-    # v: a package version
-    # req: a required package of v
-    # r: a version of req
-    # req_req: a requirement of r
-    # req_reqs: count requirements of r
-    req_reqs = Vector{Int}(m)
-    dirty = collect(1:n)
-    while !isempty(dirty)
-        vers = sort(dirty)
-        println("DIRTY: ", length(vers))
-        empty!(dirty)
-        for v in vers
-            println(versions[v])
-            for req in ver_to_reqs[v]
-                req_vers = filter(x->X[v,x] == 0, pkg_to_vers[req])
-                isempty(req_vers) && continue
-                req_reqs .= 0
-                for r in req_vers
-                    for req_req in ver_to_reqs[r]
-                        req_reqs[req_req] += 1
-                    end
-                end
-                l = length(req_vers)
-                for req_req in find(c->c >= l, req_reqs)
-                    if !(req_req in ver_to_reqs[v])
-                        push!(ver_to_reqs[v], req_req)
-                        append!(dirty, setdiff(pkg_to_reqd[ver_to_pkg[v]], dirty))
-                    end
-                end
-            end
-        end
-    end
-    foreach(sort!, ver_to_reqs)
-end
-
-function propagate_conflicts!(X)
-    # v: a package version
-    # req: a required package of v
-    # r: a version of req
-    dirty = collect(1:n)
-    while !isempty(dirty)
-        vers = sort(dirty)
-        println("DIRTY: ", length(vers))
-        empty!(dirty)
-        for v in vers
-            println(versions[v])
-            for req in ver_to_reqs[v]
-                conflicts = spzeros(Int, n)
-                for r in pkg_to_vers[req]
-                    conflicts += X[:,r]
-                end
-                l = length(pkg_to_vers[req])
-                x = find(c->c == l, conflicts)
-                if any(X[x,v] .== 0)
-                    X[x,v] = X[v,x] = 1
-                    append!(dirty, setdiff(pkg_to_reqd[ver_to_pkg[v]], dirty))
-                end
-            end
-        end
-    end
 end
 
 if false

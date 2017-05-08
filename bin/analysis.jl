@@ -157,7 +157,7 @@ function package_to_requiring_versions()
 end
 const pkg_to_reqd =  package_to_requiring_versions()
 
-function iterate_dependencies()
+function iterate_dependencies(X, P, R)
     Z = min.(1, X .+ P*P')
     D = dropzeros!(max.(0, min.(1, P*R) .- Z))
     for i = 1:typemax(Int)
@@ -168,7 +168,7 @@ function iterate_dependencies()
     @assert iszero(min.(D, Z))
     return D
 end
-const D = iterate_dependencies()
+const D = iterate_dependencies(X, P, R)
 
 function deep_requirements!()
     cnf = build_cnf!(X, [[0], [0]])
@@ -194,7 +194,8 @@ if !isfile("tmp/ver_to_reqs.jls")
 else
     const ver_to_reqs = open(deserialize, "tmp/ver_to_reqs.jls")
 end
-const R = requirements_matrix()
+R .= requirements_matrix()
+dropzeros!(R)
 
 function propagate_consistent_conflicts!()
     dirty = collect(1:n)
@@ -220,8 +221,8 @@ function propagate_consistent_conflicts!()
     end
 end
 propagate_consistent_conflicts!()
-
-const D = iterate_dependencies()
+D .= iterate_dependencies()
+dropzeros!(D)
 
 function is_satisfied(vers::Vector{Int})
     provided = unique(ver_to_pkg[v] for v in vers)

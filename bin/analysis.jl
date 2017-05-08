@@ -240,34 +240,41 @@ function pairwise_satisfiability(X, P, D)
     S = full(D'max.(P*P',X)*D) .== 0
     cnf = build_cnf!(X, [[0], [0]])
     n = checksquare(X)
-    p = sortperm(vec(sum(D, 1)), rev=true)
-    for a = 1:n-1, b = a+1:n
-        i, j = p[a], p[b]
-        X[i,j] == 0 || continue
-        S[i,j] == 0 || continue
-        println((a, b, versions[i], versions[j]))
-        cnf[1][1], cnf[2][1] = i, j
-        sat = PicoSAT.solve(cnf)
-        sat == :unsatisfiable && continue
-        vers = filter(x->1 <= x <= n, sat::Vector{Int})
-        @assert iszero(X[vers, vers])
-        @assert is_satisfied(vers)
-        while true
-            absent = setdiff(1:m, (ver_to_pkg[k] for k in vers))
-            satisfied = setdiff(find(iszero, sum(R[absent,:],1)), vers)
-            compatible = satisfied[find(iszero, sum(X[vers,satisfied],1))]
-            isempty(compatible) && break
-            sums = sum(S[:,vers], 2)
-            sort!(compatible, by = k -> sums[k])
-            for k in compatible
-                iszero(X[vers,k]) && push!(vers, k)
+    p = sortperm(vec(sum(D,1)), rev=true)
+    for a = 1:n-1
+        s = sum(S,1)
+        o = Base.Order.ord(isless, i->s[p[i]], false)
+        sort!(p, a, n, Base.Sort.MergeSort, o)
+        for b = a+1:n
+            i, j = p[a], p[b]
+            X[i,j] == 0 || continue
+            S[i,j] == 0 || continue
+            println((a, b, versions[i], versions[j]))
+            cnf[1][1], cnf[2][1] = i, j
+            sat = PicoSAT.solve(cnf)
+            sat == :unsatisfiable && continue
+            vers = filter(x->1 <= x <= n, sat::Vector{Int})
+            @assert iszero(X[vers, vers])
+            @assert is_satisfied(vers)
+            while true
+                absent = setdiff(1:m, (ver_to_pkg[k] for k in vers))
+                satisfied = setdiff(find(iszero, sum(R[absent,:],1)), vers)
+                compatible = satisfied[find(iszero, sum(X[vers,satisfied],1))]
+                isempty(compatible) && break
+                sums = sum(S[:,vers], 2)
+                sort!(compatible, by = k -> sums[k])
+                for k in compatible
+                    iszero(X[vers,k]) && push!(vers, k)
+                end
             end
+            sort!(vers)
+            @assert iszero(X[vers, vers])
+            @assert is_satisfied(vers)
+            S[vers,vers] = 1
+            println("SAT: +", length(vers), ", ", 100*countnz(S)/length(S), "%")
+            s = sum(S,1) # o captures s
+            sort!(p, b+1, n, Base.Sort.MergeSort, o)
         end
-        sort!(vers)
-        @assert iszero(X[vers, vers])
-        @assert is_satisfied(vers)
-        S[vers,vers] = 1
-        println("SAT: +", length(vers), ", ", 100*countnz(S)/length(S), "%")
     end
     return S
 end

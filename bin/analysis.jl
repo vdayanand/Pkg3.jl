@@ -230,10 +230,16 @@ function is_satisfied(vers::Vector{Int})
     required ⊆ provided
 end
 
-function pairwise_satisfiability()
-    n = checksquare(X)
-    S = full(D'X*D) .== 0
+function pairwise_satisfiability(X, P, D)
+    # if two conditions are met then we already know
+    # that a pair must be satisfiable:
+    #   1. no overlap between their potential dependent packages
+    #   2. their potential dependent versions have no conflicts
+    # in particular, this includes versions with no requirements
+    # that don't explicitly conflict
+    S = full(D'max.(P*P',X)*D) .== 0
     cnf = build_cnf!(X, [[0], [0]])
+    n = checksquare(X)
     p = sortperm(vec(sum(D, 1)), rev=true)
     for a = 1:n-1, b = a+1:n
         i, j = p[a], p[b]
@@ -243,7 +249,7 @@ function pairwise_satisfiability()
         cnf[1][1], cnf[2][1] = i, j
         sat = PicoSAT.solve(cnf)
         sat == :unsatisfiable && continue
-        vers = filter(x -> 1 <= x <= n, sat::Vector{Int})
+        vers = filter(x->1 <= x <= n, sat::Vector{Int})
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
         while true
@@ -267,15 +273,17 @@ function pairwise_satisfiability()
 end
 
 if !isfile("tmp/satisfiable.jls")
-    S = pairwise_satisfiability()
+    S = pairwise_satisfiability(X, P, D)
     open("tmp/satisfiable.jls", "w") do f
         serialize(f, S)
     end
 else
     S = open(deserialize, "tmp/satisfiable.jls")
 end
-# const X = sparse(ind2sub(size(S), find(iszero, S))..., 1)
-# const D = iterate_dependencies()
+X .= sparse(ind2sub(size(S), find(iszero, S))..., 1)
+D .= iterate_dependencies()
+dropzeros!(X)
+dropzeros!(D)
 
 if false
 

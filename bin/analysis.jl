@@ -2,7 +2,34 @@
 
 using PicoSAT
 
+function representative_versions(pkg::String; packages=Main.pkgs)
+    p = packages[pkg]
+    versions = sort!(collect(keys(p.versions)))
+    rep = pop!(versions)
+    reps = [rep]
+    while !isempty(versions)
+        rep′ = pop!(versions)
+        for (pkg′, p′) in packages, (ver, v) in p′.versions
+            haskey(v.requires, pkg) || continue
+            vers = v.requires[pkg].versions
+            if (rep in vers) ⊻ (rep′ in vers)
+                push!(reps, rep′)
+                rep = rep′
+                break
+            end
+        end
+    end
+    return reverse!(reps)
+end
+
+const packages = sort!(collect(keys(pkgs)), by=lowercase)
+const versions = Tuple{String,VersionNumber}[]
+for pkg in packages, ver in representative_versions(pkg)
+    push!(versions, (pkg, ver))
+end
+
 function version_to_package()
+    n = length(versions)
     pkgs = zeros(Int, n)
     for (i, p1) in enumerate(packages),
         (j, (p2, _)) in enumerate(versions)
@@ -13,12 +40,9 @@ function version_to_package()
     return pkgs
 end
 const ver_to_pkg = version_to_package()
-const P = sparse(1:n, ver_to_pkg, 1, n, m)
-
-@assert all(x->x == 1, sum(P, 2))
-@assert all(x->x >= 1, sum(P, 1))
 
 function package_to_version_range()
+    m = length(packages)
     los = zeros(Int, m)
     his = zeros(Int, m)
     for v in 1:n
@@ -38,26 +62,8 @@ function version_to_required_packages()
 end
 const ver_to_reqs = version_to_required_packages()
 
-function requirements_matrix()
-    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
-    R = sparse(first.(pairs), last.(pairs), 1, m, n)
-    @assert iszero(min.(P*R, P*P'))
-    return R
-end
-const R = requirements_matrix()
-
-function package_to_requiring_versions()
-    rev = [Int[] for _ = 1:m]
-    for v in 1:n
-        for req in ver_to_reqs[v]
-            push!(rev[req], v)
-        end
-    end
-    return rev
-end
-const pkg_to_reqd =  package_to_requiring_versions()
-
 function incompatibility_matrix()
+    n = length(versions)
     X = spzeros(Int, n, n)
     for (i, (p1, v1)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
@@ -73,20 +79,8 @@ function incompatibility_matrix()
 end
 const X = incompatibility_matrix()
 
-function iterate_dependencies()
-    Z = min.(1, X .+ P*P')
-    D = dropzeros!(max.(0, min.(1, P*R) .- Z))
-    for i = 1:typemax(Int)
-        n = countnz(D)
-        D .= dropzeros!(max.(0, min.(1, D .+ D^2) .- Z))
-        countnz(D) <= n && break
-    end
-    @assert iszero(min.(D, Z))
-    return D
-end
-const D = iterate_dependencies()
-
 function build_cnf!(cnf::Vector{Vector{Int}})
+    n = length(versions)
     for (pkg, vers) in enumerate(pkg_to_vers)
         push!(cnf, [-(n+pkg); vers])
         for ver in vers
@@ -102,6 +96,80 @@ function build_cnf!(cnf::Vector{Vector{Int}})
     return cnf
 end
 build_cnf() = build_cnf!(Vector{Int}[])
+
+function unsatisfiable()
+    unsat = Int[]
+    cnf = build_cnf!([[0]])
+    for v in 1:n
+        print((v, versions[v]), " ...")
+        cnf[1][1] = v
+        if PicoSAT.solve(cnf) == :unsatisfiable
+            print(" UNSAT")
+            push!(unsat, v)
+        end
+        println()
+    end
+    return unsat
+end
+
+function duplicates()
+    dups = Int[]
+    for p in 1:m
+        d = Dict(X[:,v] => v for v in pkg_to_vers[p])
+        append!(dups, setdiff(pkg_to_vers[p], values(d)))
+    end
+    return dups
+end
+
+deleteat!(versions, sort!(unsatisfiable() ∪ duplicates()))
+
+const packages = unique(first.(versions))
+const m, n = length(packages), length(versions)
+const ver_to_pkg = version_to_package()
+const pkg_to_vers = package_to_version_range()
+const ver_to_reqs = version_to_required_packages()
+const X = incompatibility_matrix()
+
+const versions_rev = Dict(v => i for (i, v) in enumerate(versions))
+const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
+
+const P = sparse(1:n, ver_to_pkg, 1, n, m)
+
+@assert all(x->x == 1, sum(P, 2))
+@assert all(x->x >= 1, sum(P, 1))
+
+function requirements_matrix()
+    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
+    R = sparse(first.(pairs), last.(pairs), 1, m, n)
+    @assert iszero(min.(P*R, P*P'))
+    return R
+end
+
+const R = requirements_matrix()
+
+function package_to_requiring_versions()
+    rev = [Int[] for _ = 1:m]
+    for v in 1:n
+        for req in ver_to_reqs[v]
+            push!(rev[req], v)
+        end
+    end
+    return rev
+end
+const pkg_to_reqd =  package_to_requiring_versions()
+
+function iterate_dependencies()
+    Z = min.(1, X .+ P*P')
+    D = dropzeros!(max.(0, min.(1, P*R) .- Z))
+    for i = 1:typemax(Int)
+        n = countnz(D)
+        D .= dropzeros!(max.(0, min.(1, D .+ D^2) .- Z))
+        countnz(D) <= n && break
+    end
+    @assert iszero(min.(D, Z))
+    return D
+end
+const D = iterate_dependencies()
 
 function deep_requirements!()
     cnf = build_cnf!([[0], [0]])

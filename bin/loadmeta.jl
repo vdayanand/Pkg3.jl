@@ -150,33 +150,3 @@ end
 const dir = Pkg.dir("METADATA")
 const pkgs = load_packages(dir)
 prune!(pkgs)
-const packages = sort!(collect(keys(pkgs)), by=lowercase)
-
-function representative_versions(pkg::String; packages=Main.pkgs)
-    p = packages[pkg]
-    versions = sort!(collect(keys(p.versions)))
-    rep = pop!(versions)
-    reps = [rep]
-    while !isempty(versions)
-        rep′ = pop!(versions)
-        for (pkg′, p′) in packages, (ver, v) in p′.versions
-            haskey(v.requires, pkg) || continue
-            vers = v.requires[pkg].versions
-            if (rep in vers) ⊻ (rep′ in vers)
-                push!(reps, rep′)
-                rep = rep′
-                break
-            end
-        end
-    end
-    return reverse!(reps)
-end
-
-const versions = Tuple{String,VersionNumber}[]
-for pkg in packages, ver in representative_versions(pkg)
-    push!(versions, (pkg, ver))
-end
-
-const versions_rev = Dict(v => i for (i, v) in enumerate(versions))
-const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
-const m, n = length(pkgs), length(versions)

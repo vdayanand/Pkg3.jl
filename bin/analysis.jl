@@ -2,14 +2,14 @@
 
 using PicoSAT
 
-function representative_versions(pkg::String; packages=Main.pkgs)
-    p = packages[pkg]
+function representative_versions(pkg::String)
+    p = pkgs[pkg]
     versions = sort!(collect(keys(p.versions)))
     rep = pop!(versions)
     reps = [rep]
     while !isempty(versions)
         rep′ = pop!(versions)
-        for (pkg′, p′) in packages, (ver, v) in p′.versions
+        for (pkg′, p′) in pkgs, (ver, v) in p′.versions
             haskey(v.requires, pkg) || continue
             vers = v.requires[pkg].versions
             if (rep in vers) ⊻ (rep′ in vers)
@@ -42,7 +42,7 @@ end
 const ver_to_pkg = version_to_package()
 
 function package_to_version_range()
-    m = length(packages)
+    m, n = length(packages), length(versions)
     los = zeros(Int, m)
     his = zeros(Int, m)
     for v in 1:n
@@ -79,7 +79,7 @@ function incompatibility_matrix()
 end
 const X = incompatibility_matrix()
 
-function build_cnf!(cnf::Vector{Vector{Int}})
+function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
     n = length(versions)
     for (pkg, vers) in enumerate(pkg_to_vers)
         push!(cnf, [-(n+pkg); vers])
@@ -95,12 +95,12 @@ function build_cnf!(cnf::Vector{Vector{Int}})
     end
     return cnf
 end
-build_cnf() = build_cnf!(Vector{Int}[])
+build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
 
-function unsatisfiable()
+function unsatisfiable(X::AbstractMatrix)
     unsat = Int[]
-    cnf = build_cnf!([[0]])
-    for v in 1:n
+    cnf = build_cnf!(X, [[0]])
+    for v in 1:length(versions)
         print((v, versions[v]), " ...")
         cnf[1][1] = v
         if PicoSAT.solve(cnf) == :unsatisfiable
@@ -114,25 +114,25 @@ end
 
 function duplicates()
     dups = Int[]
-    for p in 1:m
+    for p in 1:length(packages)
         d = Dict(X[:,v] => v for v in pkg_to_vers[p])
         append!(dups, setdiff(pkg_to_vers[p], values(d)))
     end
     return dups
 end
 
-deleteat!(versions, sort!(unsatisfiable() ∪ duplicates()))
+deleteat!(versions, sort!(unsatisfiable(X) ∪ duplicates()))
 
-const packages = unique(first.(versions))
-const m, n = length(packages), length(versions)
-const ver_to_pkg = version_to_package()
-const pkg_to_vers = package_to_version_range()
-const ver_to_reqs = version_to_required_packages()
+append!(empty!(packages), unique(first.(versions)))
+append!(empty!(ver_to_pkg), version_to_package())
+append!(empty!(pkg_to_vers), package_to_version_range())
+append!(empty!(ver_to_reqs), version_to_required_packages())
 const X = incompatibility_matrix()
 
 const versions_rev = Dict(v => i for (i, v) in enumerate(versions))
 const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
 
+const m, n = length(packages), length(versions)
 const P = sparse(1:n, ver_to_pkg, 1, n, m)
 
 @assert all(x->x == 1, sum(P, 2))
@@ -144,7 +144,6 @@ function requirements_matrix()
     @assert iszero(min.(P*R, P*P'))
     return R
 end
-
 const R = requirements_matrix()
 
 function package_to_requiring_versions()
@@ -172,7 +171,7 @@ end
 const D = iterate_dependencies()
 
 function deep_requirements!()
-    cnf = build_cnf!([[0], [0]])
+    cnf = build_cnf!(X, [[0], [0]])
     for (r, v) in zip(findn(P'D)...)
         ver_to_pkg[v] == r && continue
         r in ver_to_reqs[v] && continue
@@ -233,7 +232,7 @@ end
 function pairwise_satisfiability()
     n = checksquare(X)
     S = full(D'X*D) .== 0
-    cnf = build_cnf!([[0], [0]])
+    cnf = build_cnf!(X, [[0], [0]])
     p = sortperm(vec(sum(D, 1)), rev=true)
     for a = 1:n-1, b = a+1:n
         i, j = p[a], p[b]

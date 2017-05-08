@@ -257,11 +257,7 @@ function pairwise_satisfiability(X, P, D)
             satisfied = setdiff(find(iszero, sum(R[absent,:],1)), vers)
             compatible = satisfied[find(iszero, sum(X[vers,satisfied],1))]
             isempty(compatible) && break
-            sums = sum(S[:,vers], 2)
-            sort!(compatible, by = k -> sums[k])
-            for k in compatible
-                iszero(X[vers,k]) && push!(vers, k)
-            end
+            push!(vers, compatible[indmin(sum(S[compatible,vers],2))])
         end
         sort!(vers)
         @assert iszero(X[vers, vers])

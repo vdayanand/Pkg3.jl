@@ -252,12 +252,30 @@ function pairwise_satisfiability(X, P, D)
         vers = filter(x->1 <= x <= n, sat::Vector{Int})
         @assert iszero(X[vers, vers])
         @assert is_satisfied(vers)
+        absent = setdiff(1:m, (ver_to_pkg[k] for k in vers))
         while true
-            absent = setdiff(1:m, (ver_to_pkg[k] for k in vers))
-            satisfied = setdiff(find(iszero, sum(R[absent,:],1)), vers)
-            compatible = satisfied[find(iszero, sum(X[vers,satisfied],1))]
-            isempty(compatible) && break
-            push!(vers, compatible[indmin(sum(S[compatible,vers],2))])
+            s_goal = 0
+            s_min = n
+            k_min = 0
+            for k in p
+                iszero(X[vers,k]) || continue
+                iszero(R[absent,k]) || continue
+                s = sum(S[vers,k])
+                if s == s_goal
+                    s_min = s
+                    k_min = k
+                    break
+                end
+                if s < s_min
+                    s_min = s
+                    k_min = k
+                end
+            end
+            k_min == 0 && break
+            s_goal = s_min
+            push!(vers, k_min)
+            a = findfirst(absent, ver_to_pkg[k_min])
+            a != 0 && deleteat!(absent, a)
         end
         sort!(vers)
         @assert iszero(X[vers, vers])

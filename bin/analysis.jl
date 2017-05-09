@@ -2,29 +2,9 @@
 
 using PicoSAT
 
-function representative_versions(pkg::String)
-    p = pkgs[pkg]
-    versions = sort!(collect(keys(p.versions)))
-    rep = pop!(versions)
-    reps = [rep]
-    while !isempty(versions)
-        rep′ = pop!(versions)
-        for (pkg′, p′) in pkgs, (ver, v) in p′.versions
-            haskey(v.requires, pkg) || continue
-            vers = v.requires[pkg].versions
-            if (rep in vers) ⊻ (rep′ in vers)
-                push!(reps, rep′)
-                rep = rep′
-                break
-            end
-        end
-    end
-    return reverse!(reps)
-end
-
 const packages = sort!(collect(keys(pkgs)), by=lowercase)
 const versions = Tuple{String,VersionNumber}[]
-for pkg in packages, ver in representative_versions(pkg)
+for pkg in packages, ver in sort!(collect(keys(pkgs[pkg].versions)))
     push!(versions, (pkg, ver))
 end
 
@@ -97,26 +77,33 @@ function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
 end
 build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
 
-function unsatisfiable(X::AbstractMatrix)
-    if isfile("tmp/unsatisfiable.jls")
-        uvx = open(deserialize, "tmp/unsatisfiable.jls")
-        return findin(versions, uvx)
+function unique_satisfiables(X::AbstractMatrix)
+    if isfile("tmp/unique_sats.jls")
+        vs = open(deserialize, "tmp/unique_sats.jls")
+        return findin(versions, vs)
     end
-    unsat = Int[]
-    cnf = build_cnf!(X, [[0]])
+    d = Dict()
     for v in 1:length(versions)
-        print((v, versions[v]), " ...")
+        key = (ver_to_pkg[v], find(X[:,v]), find(R[:,v]))
+        push!(get!(d, key, Int[]), v)
+    end
+    vers = Int[]
+    cnf = build_cnf!(X, [[0]])
+    for dups in sort!(collect(values(d)), by=first)
+        v = last(dups)
+        print((v, versions[v]), " ... ")
         cnf[1][1] = v
-        if PicoSAT.solve(cnf) == :unsatisfiable
-            print(" UNSAT")
-            push!(unsat, v)
+        if PicoSAT.solve(cnf) != :unsatisfiable
+            push!(vers, v)
+        else
+            print("UNSAT")
         end
         println()
     end
-    open("tmp/unsatisfiable.jls", "w") do f
-        serialize(f, versions[unsat])
+    open("tmp/unique_sats.jls", "w") do f
+        serialize(f, versions[vers])
     end
-    return unsat
+    return vers
 end
 
 function requirements_matrix()
@@ -129,16 +116,9 @@ end
 const R = requirements_matrix()
 
 function duplicates()
-    dups = Int[]
-    for p in 1:length(packages)
-        d = Dict((X[:,v], R[:,v]) => v for v in pkg_to_vers[p])
-        append!(dups, setdiff(pkg_to_vers[p], values(d)))
-    end
-    return dups
 end
 
-deleteat!(versions, sort!(unsatisfiable(X) ∪ duplicates()))
-
+append!(empty!(versions), unique_satisfiables(X))
 append!(empty!(packages), unique(first.(versions)))
 append!(empty!(ver_to_pkg), version_to_package())
 append!(empty!(pkg_to_vers), package_to_version_range())

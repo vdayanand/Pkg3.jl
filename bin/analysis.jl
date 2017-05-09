@@ -119,10 +119,19 @@ function unsatisfiable(X::AbstractMatrix)
     return unsat
 end
 
+function requirements_matrix()
+    m, n = length(packages), length(versions)
+    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
+    R = sparse(first.(pairs), last.(pairs), 1, m, n)
+    isdefined(:P) && @assert iszero(min.(P*R, P*P'))
+    return R
+end
+const R = requirements_matrix()
+
 function duplicates()
     dups = Int[]
     for p in 1:length(packages)
-        d = Dict(X[:,v] => v for v in pkg_to_vers[p])
+        d = Dict((X[:,v], R[:,v]) => v for v in pkg_to_vers[p])
         append!(dups, setdiff(pkg_to_vers[p], values(d)))
     end
     return dups

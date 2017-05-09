@@ -98,6 +98,10 @@ end
 build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
 
 function unsatisfiable(X::AbstractMatrix)
+    if isfile("tmp/unsatisfiable.jls")
+        uvx = open(deserialize, "tmp/unsatisfiable.jls")
+        return findin(versions, uvx)
+    end
     unsat = Int[]
     cnf = build_cnf!(X, [[0]])
     for v in 1:length(versions)
@@ -108,6 +112,9 @@ function unsatisfiable(X::AbstractMatrix)
             push!(unsat, v)
         end
         println()
+    end
+    open("tmp/unsatisfiable.jls", "w") do f
+        serialize(f, versions[unsat])
     end
     return unsat
 end
@@ -186,6 +193,7 @@ function deep_requirements!()
     foreach(sort!, ver_to_reqs)
 end
 
+#=
 if !isfile("tmp/ver_to_reqs.jls")
     deep_requirements!()
     open("tmp/ver_to_reqs.jls", "w") do f
@@ -291,6 +299,7 @@ X .= sparse(ind2sub(size(S), find(iszero, S))..., 1)
 D .= iterate_dependencies()
 dropzeros!(X)
 dropzeros!(D)
+=#
 
 if false
 

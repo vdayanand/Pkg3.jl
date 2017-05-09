@@ -3,6 +3,7 @@
 using PicoSAT
 
 const packages = sort!(collect(keys(pkgs)), by=lowercase)
+
 const versions = Tuple{String,VersionNumber}[]
 for pkg in packages, ver in sort!(collect(keys(pkgs[pkg].versions)))
     push!(versions, (pkg, ver))
@@ -42,24 +43,47 @@ function version_to_required_packages()
 end
 const ver_to_reqs = version_to_required_packages()
 
-function incompatibility_matrix()
+function version_conflicts()
     n = length(versions)
-    X = spzeros(Int, n, n)
+    conflicts = [Int[] for _ = 1:n]
     for (i, (p1, v1)) in enumerate(versions)
         r = pkgs[p1].versions[v1].requires
         for (j, (p2, v2)) in enumerate(versions)
             if haskey(r, p2) && v2 ∉ r[p2].versions
-                X[i,j] = X[j,i] = 1
+                push!(conflicts[i], j)
+                push!(conflicts[j], i)
             end
         end
     end
-    @assert iszero(diag(X))
-    @assert issymmetric(X)
-    return X
+    return conflicts
 end
-const X = incompatibility_matrix()
+const conflicts = version_conflicts()
 
-function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
+function representative_versions()
+    reps = Int[]
+    for p in 1:length(packages)
+        d = Dict((conflicts[v], ver_to_reqs[v]) => v for v in pkg_to_vers[p])
+        append!(reps, sort!(collect(values(d))))
+    end
+    return reps
+end
+
+function eliminiate_duplicates()
+    while true
+        reps = representative_versions()
+        length(reps) == length(versions) && break
+        vers = versions[reps]
+        append!(empty!(versions), vers)
+        append!(empty!(packages), unique(first.(versions)))
+        append!(empty!(ver_to_pkg), version_to_package())
+        append!(empty!(pkg_to_vers), package_to_version_range())
+        append!(empty!(ver_to_reqs), version_to_required_packages())
+        append!(empty!(conflicts), version_conflicts())
+    end
+end
+eliminiate_duplicates()
+
+function build_cnf!(cnf::Vector{Vector{Int}})
     n = length(versions)
     for (pkg, vers) in enumerate(pkg_to_vers)
         push!(cnf, [-(n+pkg); vers])
@@ -70,79 +94,49 @@ function build_cnf!(X::AbstractMatrix, cnf::Vector{Vector{Int}})
     for (ver, reqs) in enumerate(ver_to_reqs), req in reqs
         push!(cnf, [-ver, n+req])
     end
-    for (v1, v2) in zip(findn(X)...)
+    for (v1, v2s) in enumerate(conflicts), v2 in v2s
         push!(cnf, [-v1, -v2])
     end
     return cnf
 end
-build_cnf(X::AbstractMatrix) = build_cnf!(X, Vector{Int}[])
+build_cnf() = build_cnf!(Vector{Int}[])
 
-function unique_satisfiables(X::AbstractMatrix)
-    if isfile("tmp/unique_sats.jls")
-        vs = open(deserialize, "tmp/unique_sats.jls")
-        return findin(versions, vs)
-    end
-    d = Dict()
+function unsatisfiable()
+    if isfile("tmp/unsatisfiable.jls")
+        uvx = open(deserialize, "tmp/unsatisfiable.jls")
+        return findin(versions, uvx)
+     end
+    unsat = Int[]
+    cnf = build_cnf!([[0]])
     for v in 1:length(versions)
-        key = (ver_to_pkg[v], find(X[:,v]), find(R[:,v]))
-        push!(get!(d, key, Int[]), v)
-    end
-    vers = Int[]
-    cnf = build_cnf!(X, [[0]])
-    for dups in sort!(collect(values(d)), by=first)
-        v = last(dups)
-        print((v, versions[v]), " ... ")
+        print((v, versions[v]), " ...")
         cnf[1][1] = v
-        if PicoSAT.solve(cnf) != :unsatisfiable
-            push!(vers, v)
-        else
-            print("UNSAT")
+        if PicoSAT.solve(cnf) == :unsatisfiable
+            print(" UNSAT")
+            push!(unsat, v)
         end
         println()
     end
-    open("tmp/unique_sats.jls", "w") do f
-        serialize(f, versions[vers])
+    open("tmp/unsatisfiable.jls", "w") do f
+        serialize(f, versions[unsat])
     end
-    return vers
+    return unsat
 end
 
-function requirements_matrix()
-    m, n = length(packages), length(versions)
-    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
-    R = sparse(first.(pairs), last.(pairs), 1, m, n)
-    isdefined(:P) && @assert iszero(min.(P*R, P*P'))
-    return R
+unsat = unsatisfiable()
+if !isempty(unsat)
+    vers = versions[setdiff(1:length(versions), unsat)]
+    append!(empty!(versions), vers)
+    append!(empty!(packages), unique(first.(versions)))
+    append!(empty!(ver_to_pkg), version_to_package())
+    append!(empty!(pkg_to_vers), package_to_version_range())
+    append!(empty!(ver_to_reqs), version_to_required_packages())
+    append!(empty!(conflicts), version_conflicts())
+    eliminiate_duplicates()
 end
-const R = requirements_matrix()
-
-function duplicates()
-end
-
-append!(empty!(versions), unique_satisfiables(X))
-append!(empty!(packages), unique(first.(versions)))
-append!(empty!(ver_to_pkg), version_to_package())
-append!(empty!(pkg_to_vers), package_to_version_range())
-append!(empty!(ver_to_reqs), version_to_required_packages())
-const X = incompatibility_matrix()
-
-const versions_rev = Dict(v => i for (i, v) in enumerate(versions))
-const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
-
-const m, n = length(packages), length(versions)
-const P = sparse(1:n, ver_to_pkg, 1, n, m)
-
-@assert all(x->x == 1, sum(P, 2))
-@assert all(x->x >= 1, sum(P, 1))
-
-function requirements_matrix()
-    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
-    R = sparse(first.(pairs), last.(pairs), 1, m, n)
-    @assert iszero(min.(P*R, P*P'))
-    return R
-end
-const R = requirements_matrix()
 
 function package_to_requiring_versions()
+    m, n = length(packages), length(versions)
     rev = [Int[] for _ = 1:m]
     for v in 1:n
         for req in ver_to_reqs[v]
@@ -153,7 +147,14 @@ function package_to_requiring_versions()
 end
 const pkg_to_reqd =  package_to_requiring_versions()
 
-function iterate_dependencies(X, P, R)
+function requirements_matrix()
+    pairs = [(i, j) for (j, v) in enumerate(ver_to_reqs) for i in v]
+    R = sparse(first.(pairs), last.(pairs), 1, m, n)
+    isdefined(:P) && @assert iszero(min.(P*R, P*P'))
+    return R
+end
+
+function iterate_dependencies()
     Z = min.(1, X .+ P*P')
     D = dropzeros!(max.(0, min.(1, P*R) .- Z))
     for i = 1:typemax(Int)
@@ -164,7 +165,20 @@ function iterate_dependencies(X, P, R)
     @assert iszero(min.(D, Z))
     return D
 end
-const D = iterate_dependencies(X, P, R)
+
+const m, n = length(packages), length(versions)
+const P = sparse(1:n, ver_to_pkg, 1, n, m)
+const R = requirements_matrix()
+const X = sparse(
+    [i for (i, js) in enumerate(conflicts) for j in js],
+    [j for (i, js) in enumerate(conflicts) for j in js], 1, n, n)
+const D = iterate_dependencies()
+
+const versions_rev = Dict(v => i for (i, v) in enumerate(versions))
+const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
+
+@assert all(x->x == 1, sum(P, 2))
+@assert all(x->x >= 1, sum(P, 1))
 
 function deep_requirements!()
     cnf = build_cnf!(X, [[0], [0]])

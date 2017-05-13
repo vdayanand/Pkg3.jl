@@ -155,14 +155,12 @@ function requirements_matrix()
 end
 
 function iterate_dependencies()
-    Z = min.(1, X .+ P*P')
-    D = dropzeros!(max.(0, min.(1, P*R) .- Z))
+    D = dropzeros!(min.(1, P*R))
     for i = 1:typemax(Int)
         n = countnz(D)
-        D .= dropzeros!(max.(0, min.(1, D .+ D^2) .- Z))
+        D = dropzeros!(min.(1, D+D^2))
         countnz(D) <= n && break
     end
-    @assert iszero(min.(D, Z))
     return D
 end
 
@@ -172,7 +170,6 @@ const R = requirements_matrix()
 const X = sparse(
     [i for (i, js) in enumerate(conflicts) for j in js],
     [j for (i, js) in enumerate(conflicts) for j in js], 1, n, n)
-const D = iterate_dependencies()
 
 const versions_rev = Dict(v => i for (i, v) in enumerate(versions))
 const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
@@ -180,6 +177,23 @@ const packages_rev = Dict(p => i for (i, p) in enumerate(packages))
 @assert all(x->x == 1, sum(P, 2))
 @assert all(x->x >= 1, sum(P, 1))
 
+const D = iterate_dependencies()
+D[find(D .& D')] = 0
+dropzeros!(D)
+
+include("graphutils.jl")
+
+G = dropzeros!(min.(1, [P P; spzeros(Int, m, m+n)]))
+for _ = 1:typemax(Int)
+    nz = countnz(G)
+    G = dropzeros!(min.(1, G + G*G))
+    countnz(G) == nz && break
+end
+T = sorttree!(StrongModuleTree(G))
+V = [versions; packages][T]
+
+
+#=
 function deep_requirements!()
     cnf = build_cnf!(X, [[0], [0]])
     for (r, v) in zip(findn(P'D)...)
@@ -196,7 +210,6 @@ function deep_requirements!()
     foreach(sort!, ver_to_reqs)
 end
 
-#=
 if !isfile("tmp/ver_to_reqs.jls")
     deep_requirements!()
     open("tmp/ver_to_reqs.jls", "w") do f
@@ -360,7 +373,7 @@ if false
     TG = sorttree!(StrongModuleTree(G))
     VG = [packages; versions][TG]
 
-    H = [spzeros(Int, m, m) P; spzeros(Int, n, m) X]
+    H = [spzeros(Int, m, m) P; spzeros(Int, n, m) D]
     TH = sorttree!(StrongModuleTree(H))
     VH = [packages; versions][TH]
 

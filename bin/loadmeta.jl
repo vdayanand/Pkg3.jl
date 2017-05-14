@@ -44,6 +44,7 @@ Version(sha1::String) = Version(sha1, Dict{String,Require}())
 
 function load_requires(path::String)
     requires = Dict{String,Require}()
+    requires["julia"] = Require(VersionInterval())
     isfile(path) || return requires
     for r in filter!(r->r isa Requirement, Reqs.read(path))
         @assert length(r.versions.intervals) == 1

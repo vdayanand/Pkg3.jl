@@ -48,5 +48,15 @@ function build_cnf(R, a)
         B, C = subpackages[b], subpackages[c]
         B[1] == C[1] && push!(cnf, [-i, -j])
     end
-    return cnf
+    return v, cnf
+end
+
+function solutions(R, a)
+    v, cnf = build_cnf(R, a)
+    sols = Set()
+    for sol in PicoSAT.itersolve(cnf)
+        filter!(x->x > 0, sol)
+        push!(sols, map(first, subpackages[v[sol]]))
+    end
+    return sort!(collect(sols), lt=lexless)
 end

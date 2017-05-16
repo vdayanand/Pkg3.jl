@@ -353,11 +353,11 @@ function Base.sort!(t::StrongModuleTree; lt=isless, by=first_leaf, rev::Bool=fal
 end
 
 function StrongModuleTree(
-    G::AbstractMatrix,
-    v::AbstractVector{T},
-    op::Vector{Int},
-    cl::Vector{Int},
-) where T
+    G::AbstractMatrix,    # directed graph
+    v::AbstractVector{T}, # permutation of vertices
+    op::Vector{Int},      # open parens per vertex
+    cl::Vector{Int},      # close parens per vertex
+) where {T <: Any}
     function classify_nodes(t::Vector)
         n = length(t)
         counts = zeros(Int, n)

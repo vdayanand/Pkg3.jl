@@ -53,10 +53,16 @@ end
 
 function solutions(R, a)
     v, cnf = build_cnf(R, a)
-    sols = Set()
+    sols = Dict()
     for sol in PicoSAT.itersolve(cnf)
         filter!(x->x > 0, sol)
-        push!(sols, map(first, subpackages[v[sol]]))
+        subs = subpackages[v[sol]]
+        key = sort!(map(first, subs), by=lowercase)
+        val = get!(sols, key, Dict())
+        for (pkg, reqs) in subs
+            push!(get!(val, pkg, Set()), sort!(reqs))
+        end
     end
-    return sort!(collect(sols), lt=lexless)
+    [[p => sort!(sort!(collect(r), lt=lexless), by=length)
+        for (p, r) in subs] for (pkgs, subs) in sols]
 end

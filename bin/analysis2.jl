@@ -25,9 +25,9 @@ end
 
 function build_cnf(R, a)
     # all dependencies
-    v = find(R[:, a])
+    v = find(maximum(R[:, a], 2))
     # require `a` itself
-    cnf = [[findfirst(v, a)]]
+    cnf = [findin(v, a)]
     # requirements of subpackages
     for (i, b) in enumerate(v)
         B = subpackages[b]
@@ -63,6 +63,7 @@ function solutions(R, a)
             push!(get!(val, pkg, Set()), sort!(reqs))
         end
     end
-    [[p => sort!(sort!(collect(r), lt=lexless), by=length)
-        for (p, r) in subs] for (pkgs, subs) in sols]
+    [Dict(p => sort!(sort!([r...], lt=lexless), by=length)
+        for (p, r) in subs)
+        for (pkgs, subs) in sols]
 end

@@ -1,10 +1,10 @@
 #!/usr/bin/env julia
 
-using Base.Random: UUID
-using Base.Pkg.Types
-using Base.Pkg.Reqs: Reqs, Requirement
-using Base.LinAlg: checksquare
 using Base: thispatch, thisminor, nextpatch, nextminor
+using Base.Pkg.Reqs: Reqs, Requirement
+using Base.Pkg.Types
+using Base.LinAlg: checksquare
+using Base.Random: UUID
 using SHA
 
 ## Computing UUID5 values from (namespace, key) pairs ##
@@ -73,19 +73,19 @@ function load_versions(dir::String)
 end
 
 function load_packages(dir::String)
-    packages = Dict{String,Package}()
+    pkgs = Dict{String,Package}()
     for pkg in readdir(dir)
         path = joinpath(dir, pkg)
         url = joinpath(path, "url")
         versions = joinpath(path, "versions")
         isfile(url) || continue
-        packages[pkg] = Package(
+        pkgs[pkg] = Package(
             uuid5(uuid_julia, pkg),
             readchomp(url),
             load_versions(versions),
         )
     end
-    packages["julia"] = Package(
+    pkgs["julia"] = Package(
         uuid5(uuid_julia, "julia"),
         "https://github.com/JuliaLang/julia.git",
         Dict(
@@ -119,7 +119,7 @@ function load_packages(dir::String)
             v"0.5.2"  => Version("f4c6c9d4bbbd9587d84494e314f692c15ff1f9c0"),
         ),
     )
-    return packages
+    return pkgs
 end
 
 @eval julia_versions() = $([VersionNumber(0,m) for m=1:5])
@@ -128,27 +128,26 @@ julia_versions(vi::VersionInterval) = julia_versions(v->v in vi)
 
 macro clean(ex) :(x = $(esc(ex)); $(esc(:clean)) &= x; x) end
 
-function prune!(packages::Associative{String,Package})
+function prune!(pkgs::Associative{String,Package})
     # remove unsatisfiable versions
     while true
         clean = true
-        filter!(packages) do pkg, p
+        filter!(pkgs) do pkg, p
             filter!(p.versions) do ver, v
                 @clean ver == thispatch(ver) > v"0.0.0" &&
                 all(v.requires) do kv
                     req, r = kv
-                    haskey(packages, req) &&
-                    any(w->w in r.versions, keys(packages[req].versions))
+                    haskey(pkgs, req) &&
+                    any(w->w in r.versions, keys(pkgs[req].versions))
                 end
             end
             @clean !isempty(p.versions)
         end
-        clean && return packages
+        clean && break
     end
+    return pkgs
 end
 
 ## Load package data ##
 
-const dir = Pkg.dir("METADATA")
-const pkgs = load_packages(dir)
-prune!(pkgs)
+const pkgs = load_packages(Pkg.dir("METADATA"))

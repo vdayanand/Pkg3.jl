@@ -116,6 +116,7 @@ function load_packages(dir::String)
             v"0.4.7"  => Version("ae26b25d43317d7dd3ca05f60b70677aab9c0e08"),
             v"0.5.0"  => Version("3c9d75391c72d7c32eea75ff187ce77b2d5effc8"),
             v"0.5.1"  => Version("6445c82d0060dbe82b88436f0f4371a4ee64d918"),
+            v"0.5.2"  => Version("f4c6c9d4bbbd9587d84494e314f692c15ff1f9c0"),
         ),
     )
     return packages

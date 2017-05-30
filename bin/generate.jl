@@ -31,8 +31,11 @@ for (bucket, b_pkgs) in buckets
             println(io, "name = ", repr(pkg))
             println(io, "uuid = ", repr(string(p.uuid)))
             println(io, "repo = ", repr(p.url))
-            println(io)
-            println(io, "[versions]")
+            for (ver, v) in sort!(collect(p.versions), by=first)
+                println(io)
+                println(io, "[", toml_key("version", string(ver)), "]")
+                println(io, "hash-sha1 = ", repr(v.sha1))
+            end
         end
     end
 end

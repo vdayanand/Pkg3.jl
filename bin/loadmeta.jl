@@ -20,6 +20,8 @@ uuid5(namespace::UUID, key::AbstractString) = uuid5(namespace, String(key))
 
 const uuid_dns = UUID(0x6ba7b810_9dad_11d1_80b4_00c04fd430c8)
 const uuid_julia = uuid5(uuid_dns, "julialang.org")
+const uuid_package = uuid5(uuid_julia, "package")
+const uuid_registry = uuid5(uuid_julia, "registry")
 
 ## Loading data into various data structures ##
 
@@ -80,13 +82,13 @@ function load_packages(dir::String)
         versions = joinpath(path, "versions")
         isfile(url) || continue
         pkgs[pkg] = Package(
-            uuid5(uuid_julia, pkg),
+            uuid5(uuid_package, pkg),
             readchomp(url),
             load_versions(versions),
         )
     end
     pkgs["julia"] = Package(
-        uuid5(uuid_julia, "julia"),
+        uuid5(uuid_package, "julia"),
         "https://github.com/JuliaLang/julia.git",
         Dict(
             v"0.1.1"  => Version("bddb70374fdbb2256782398c13430fa4d8b55d0b"),

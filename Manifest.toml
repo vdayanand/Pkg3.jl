@@ -1,0 +1,9 @@
+[package.Compat]
+uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
+hash-sha1 = "c38d6cd91aa18a7f874d2b976a3271ccb81a148a"
+version = "0.25.2"
+
+[package.JSON]
+uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+hash-sha1 = "6578984ae909c293031aa617244a113406d88694"
+version = "0.12.0"

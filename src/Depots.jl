@@ -15,20 +15,23 @@ function parse_packages(depot::String, registry::String)
 	packages = convert(Dict{String,String}, TOML.parsefile(packages_toml))
 end
 
-function package_name(depot::String, registry::String, uuid::String)
+function package_uuid_to_name(depot::String, registry::String, uuid::String)
 	packages = parse_packages(depot, registry)
 	get(packages, uuid, nothing)
 end
 
-function package_uuid(depot::String, registry::String, name::String)
-	packages = Dict(n => u for (u, n) in parse_packages(depot, registry))
-	get(packages, name, nothing)
+function package_name_to_uuids(name::String, depot::String, registry::String)
+	uuids = String[]
+	for (uuid, pkg) in parse_packages(depot, registry)
+		pkg == name && push!(uuids, uuid)
+	end
+	return uuids
 end
 
-function install(depot::String, name::String, version::VersionNumber)
-	for registry in registries(depot)
-		uuid = 
-	end
-end
+# function install(depot::String, name::String, version::VersionNumber)
+# 	for registry in registries(depot)
+# 		uuid = 
+# 	end
+# end
 
 end # module

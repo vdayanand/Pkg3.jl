@@ -32,4 +32,8 @@ user_depot() = abspath(homedir(), ".julia")
 
 push!(LOAD_PATH, LoadInstalled(user_depot()))
 
+@eval Base module Loading; DEPOTS = []; end
+
+push!(Base.Loading.DEPOTS, user_depot())
+
 end # module

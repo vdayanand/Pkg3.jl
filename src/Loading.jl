@@ -2,8 +2,6 @@ module Loading
 
 using TOML
 
-# Pkg3 package loaders
-
 abstract type Loader end
 
 struct LoadInstalled <: Loader
@@ -30,10 +28,8 @@ end
 
 user_depot() = abspath(homedir(), ".julia")
 
-push!(LOAD_PATH, LoadInstalled(user_depot()))
-
 @eval Base module Loading; DEPOTS = []; end
-
+push!(LOAD_PATH, LoadInstalled(user_depot()))
 push!(Base.Loading.DEPOTS, user_depot())
 
 end # module

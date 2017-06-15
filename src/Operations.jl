@@ -1,5 +1,6 @@
 module Operations
 
+using ..VersionSpecs
 using Base.Random: UUID
 using TOML
 
@@ -36,6 +37,10 @@ function find_registered(names::Vector{String})
 		end
 	end
 	return paths
+end
+
+function add(names::Dict{String,VersionSpec})
+
 end
 
 end # module

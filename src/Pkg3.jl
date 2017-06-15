@@ -1,8 +1,7 @@
 module Pkg3
 
 include("Loading.jl")
-include("Depots.jl")
-include("Environments.jl")
+include("Operations.jl")
 
 import .Loading: Loader, LoadInstalled
 

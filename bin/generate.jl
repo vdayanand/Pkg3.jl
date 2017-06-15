@@ -32,7 +32,9 @@ end
 
 write_toml(prefix, "packages") do io
     for (pkg, p) in sort!(collect(pkgs), by=(p->p.uuid.value)∘last)
-        println(io, p.uuid, " = ", repr(pkg))
+        bucket = string(uppercase(first(pkg)))
+        path = joinpath(bucket, pkg)
+        println(io, p.uuid, " = { name = ", repr(pkg), ", path = ", repr(path), " }")
     end
 end
 

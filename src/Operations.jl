@@ -45,7 +45,8 @@ end
 
 include("libgit2_discover.jl")
 
-find_env() = find_env(get(ENV, "JULIA_ENV", nothing))
+default_env() = get(ENV, "JULIA_ENV", nothing)
+find_env() = find_env(default_env())
 
 function find_env(env::String)
     names = ["JuliaConfig.toml", "Config.toml"]
@@ -90,6 +91,18 @@ function find_env(::Void)
     end
     env = VERSION.major == 0 ? defaults[2] : defaults[3]
     return joinpath(user_depot(), "environments", env, "Config.toml")
+end
+
+function find_manifest(env::Union{Void,String}=default_env())
+    config = find_env(env)
+    isfile(config) && return abspath(TOML.parsefile(config)["manifest"])
+    names = ["JuliaManifest.toml", "Manifest.toml"]
+    dir = dirname(config)
+    for name in names
+        path = joinpath(dir, name)
+        isfile(path) && return path
+    end
+    return joinpath(dir, names[end])
 end
 
 function add(pkgs::Dict{String})

@@ -1,8 +1,8 @@
 module Operations
 
-using ..VersionSpecs
-using Base.Random: UUID
 using TOML
+using Base.Random: UUID
+using ..Types
 
 depots() = Base.Loading.DEPOTS
 
@@ -48,7 +48,7 @@ function add(pkgs::Dict{String,<:VersionSpec})
     for name in names
         length(where[name]) == 1 && continue
         msg = "$name is ambiguous, it could refer to:\n"
-        for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=p->p[1].value))
+        for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=first))
             msg *= " [$i] $uuid"
             for path in paths
                 info = TOML.parsefile(joinpath(path, "package.toml"))

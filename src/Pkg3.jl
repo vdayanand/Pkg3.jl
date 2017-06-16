@@ -1,8 +1,8 @@
 module Pkg3
 
 include("Types.jl")
-include("Loading.jl")
 include("Operations.jl")
+include("Loading.jl")
 
 import .Types: VersionSpec, @vs_str
 export VersionSpec, @vs_str

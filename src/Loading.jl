@@ -1,6 +1,7 @@
 module Loading
 
 using TOML
+using Pkg3.Operations: user_depot
 
 abstract type Loader end
 
@@ -25,8 +26,6 @@ function Base.load_hook(loader::LoadInstalled, name::String, found)
     # if it is, return it, otherwise pass through
     return isfile(path) ? path : found
 end
-
-user_depot() = abspath(homedir(), ".julia")
 
 @eval Base module Loading; DEPOTS = []; end
 push!(LOAD_PATH, LoadInstalled(user_depot()))

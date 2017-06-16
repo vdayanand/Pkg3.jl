@@ -2,8 +2,10 @@ module Operations
 
 using TOML
 using Base.Random: UUID
+using Base: LibGit2
 using Pkg3.Types
 
+user_depot() = abspath(homedir(), ".julia")
 depots() = Base.Loading.DEPOTS
 
 function registries(depot::String)
@@ -39,6 +41,55 @@ function find_registered(names::Vector{String})
         end
     end
     return where
+end
+
+include("libgit2_discover.jl")
+
+find_env() = find_env(get(ENV, "JULIA_ENV", nothing))
+
+function find_env(env::String)
+    names = ["JuliaConfig.toml", "Config.toml"]
+    if isempty(env) || env == "."
+        # find project environment...
+        path = LibGit2.discover(ceiling = homedir())
+        repo = LibGit2.GitRepo(path)
+        work = LibGit2.workdir(repo)
+        for name in names
+            path = abspath(work, name)
+            isfile(path) && return path
+        end
+        return abspath(work, names[end])
+    elseif startswith(env, "/") || startswith(env, "./")
+        # path to config file or project directory
+        splitext(env)[2] == ".toml" && return abspath(env)
+        for name in names
+            path = abspath(env, name)
+            isfile(path) && return path
+        end
+        return abspath(env, names[end])
+    else # named environment
+        for depot in depots()
+            path = joinpath(depot, "environments", env, "Config.toml")
+            isfile(path) && return path
+        end
+        return joinpath(user_depot(), "environments", env, "Config.toml")
+    end
+end
+
+function find_env(::Void)
+    # look for a default environment
+    defaults = [
+        "v$(VERSION.major).$(VERSION.minor).$(VERSION.patch)",
+        "v$(VERSION.major).$(VERSION.minor)",
+        "v$(VERSION.major)",
+        "default",
+    ]
+    for depot in depots(), env in defaults
+        path = joinpath(depot, "environments", env, "Config.toml")
+        isfile(path) && return path
+    end
+    env = VERSION.major == 0 ? defaults[2] : defaults[3]
+    return joinpath(user_depot(), "environments", env, "Config.toml")
 end
 
 function add(pkgs::Dict{String})

@@ -1,5 +1,5 @@
 module VersionSpecs
-export VersionSpec
+export VersionSpec, @vs_str
 
 struct VersionSpec{n}
 	spec::NTuple{n,Int}

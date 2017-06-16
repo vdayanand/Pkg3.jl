@@ -1,7 +1,6 @@
 module Types
 
 using Base.Random: UUID
-using Base.Intrinsics: ult_int, bswap_int
 
 export SHA1, VersionSpec, @vs_str
 
@@ -11,24 +10,23 @@ Base.isless(a::UUID, b::UUID) = a.value < b.value
 
 ## SHA1 ##
 
-primitive type SHA1 160 end
-
-function Base.convert(::Type{SHA1}, bytes::Vector{UInt8})
-	length(bytes) == sizeof(SHA1) ||
-		throw(ArgumentError("wrong number of bytes for SHA1 hash: $(length(bytes))"))
-	return reinterpret(SHA1, bytes)[1]
-end
-Base.convert(::Type{Vector{UInt8}}, hash::SHA1) = reinterpret(UInt8, [hash])
-
-Base.isless(a::SHA1, b::SHA1) = ult_int(bswap_int(a), bswap_int(b))
-
-function Base.show(io::IO, hash::SHA1)
-	print(io, "SHA1(")
-	for octet in Vector{UInt8}(hash)
-		print(io, hex(octet))
+struct SHA1
+	bytes::Vector{UInt8}
+	function SHA1(bytes::Vector{UInt8})
+		length(bytes) == 20 ||
+			throw(ArgumentError("wrong number of bytes for SHA1 hash: $(length(bytes))"))
+		return new(bytes)
 	end
-	print(io, ")")
 end
+
+Base.convert(::Type{SHA1}, s::String) = SHA1(hex2bytes(s))
+Base.convert(::Type{Vector{UInt8}}, hash::SHA1) = hash.bytes
+Base.convert(::Type{String}, hash::SHA1) = bytes2hex(Vector{UInt8}(hash))
+
+Base.show(io::IO, hash::SHA1) = print(io, "SHA1(", String(hash), ")")
+Base.isless(a::SHA1, b::SHA1) = lexless(a.bytes, b.bytes)
+Base.hash(a::SHA1, h::UInt) = hash((SHA1, a.bytes), h)
+Base.:(==)(a::SHA1, b::SHA1) = a.bytes == b.bytes
 
 ## VersionSpec ##
 

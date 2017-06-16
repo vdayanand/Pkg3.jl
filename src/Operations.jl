@@ -2,7 +2,7 @@ module Operations
 
 using TOML
 using Base.Random: UUID
-using ..Types
+using Pkg3.Types
 
 depots() = Base.Loading.DEPOTS
 
@@ -44,23 +44,36 @@ end
 function add(pkgs::Dict{String,<:VersionSpec})
     names = sort!(collect(keys(pkgs)))
     where = find_registered(names)
-    ambig = false
-    for name in names
-        length(where[name]) == 1 && continue
-        msg = "$name is ambiguous, it could refer to:\n"
-        for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=first))
-            msg *= " [$i] $uuid"
-            for path in paths
-                info = TOML.parsefile(joinpath(path, "package.toml"))
-                msg *= " – $(info["repo"])"
-                break
+    # check for ambiguous package names
+    uuids = let ambig = false
+        for name in names
+            length(where[name]) == 1 && continue
+            msg = "$name is ambiguous, it could refer to:\n"
+            for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=first))
+                msg *= " [$i] $uuid"
+                for path in paths
+                    info = TOML.parsefile(joinpath(path, "package.toml"))
+                    msg *= " – $(info["repo"])"
+                    break
+                end
+                msg *= "\n"
             end
-            msg *= "\n"
+            info(msg)
+            ambig = true
         end
-        info(msg)
-        ambig = true
+        ambig && error("interactive package choice not yet implemented")
+        Dict(name => first(first(where[name])) for name in names)
     end
-    ambig && error("interactive package choice not yet implemented")
+    # find applicable package versions
+    versions = Dict{String,Dict{VersionNumber,SHA1}}()
+    for name in names
+        uuid, paths = first(where[name])
+        for path in paths
+            vers = TOML.parsefile(joinpath(path, "versions.toml"))
+            versions[name] = Dict(VersionNumber(v) => SHA1(d["hash-sha1"]) for (v,d) in vers)
+        end
+    end
+    return versions
 end
 
 end # module

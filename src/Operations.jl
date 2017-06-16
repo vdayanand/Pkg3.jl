@@ -41,7 +41,7 @@ function find_registered(names::Vector{String})
     return where
 end
 
-function add(pkgs::Dict{String,<:VersionSpec})
+function add(pkgs::Dict{String})
     names = sort!(collect(keys(pkgs)))
     where = find_registered(names)
     # check for ambiguous package names
@@ -70,7 +70,12 @@ function add(pkgs::Dict{String,<:VersionSpec})
         uuid, paths = first(where[name])
         for path in paths
             vers = TOML.parsefile(joinpath(path, "versions.toml"))
-            versions[name] = Dict(VersionNumber(v) => SHA1(d["hash-sha1"]) for (v,d) in vers)
+            versions[name] = Dict{VersionNumber,SHA1}()
+            for (v, d) in vers
+                ver = VersionNumber(v)
+                ver in pkgs[name] || continue
+                versions[name][ver] = SHA1(d["hash-sha1"])
+            end
         end
     end
     return versions

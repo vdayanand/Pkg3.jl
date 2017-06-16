@@ -105,6 +105,12 @@ function find_manifest(env::Union{Void,String}=default_env())
     return joinpath(dir, names[end])
 end
 
+function load_manifest(env::Union{Void,String}=default_env())
+    manifest = find_manifest(env)
+    T = Dict{String,Dict{String,Dict{String,String}}}
+    return isfile(manifest) ? convert(T, TOML.parsefile(manifest)) : T()
+end
+
 function add(pkgs::Dict{String})
     names = sort!(collect(keys(pkgs)))
     where = find_registered(names)

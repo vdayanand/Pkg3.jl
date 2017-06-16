@@ -1,7 +1,7 @@
 module Loading
 
 using TOML
-using Pkg3.Operations: user_depot
+using Pkg3.Operations: user_depot, load_manifest
 
 abstract type Loader end
 
@@ -11,7 +11,7 @@ end
 
 function Base.load_hook(loader::LoadInstalled, name::String, found)
     # load and parse the package manifest
-    manifest = TOML.parsefile("Manifest.toml")
+    manifest = load_manifest()
     # pull the package UUID and verion hash out of the manifest
     packages = haskey(manifest, "package")  ? manifest["package"]  : return found
     package  = haskey(packages, name)       ? packages[name]       : return found

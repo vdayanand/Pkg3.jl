@@ -1,13 +1,13 @@
 module Pkg3
 
+include("Types.jl")
 include("Loading.jl")
-include("VersionSpecs.jl")
 include("Operations.jl")
+
+import .Types: VersionSpec, @vs_str
+export VersionSpec, @vs_str
 
 import .Loading: Loader, LoadInstalled
 export Loader, LoadInstalled
-
-import .VersionSpecs: VersionSpec, @vs_str
-export VersionSpec, @vs_str
 
 end # module

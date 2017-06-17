@@ -115,25 +115,24 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     names = sort!(collect(keys(pkgs)))
     where = find_registered(names)
     # check for ambiguous package names
-    uuids = let ambig = false
-        for name in names
-            length(where[name]) == 1 && continue
-            msg = "$name is ambiguous, it could refer to:\n"
-            for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=first))
-                msg *= " [$i] $uuid"
-                for path in paths
-                    info = TOML.parsefile(joinpath(path, "package.toml"))
-                    msg *= " – $(info["repo"])"
-                    break
-                end
-                msg *= "\n"
+    ambig = false
+    for name in names
+        length(where[name]) == 1 && continue
+        msg = "$name is ambiguous, it could refer to:\n"
+        for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=first))
+            msg *= " [$i] $uuid"
+            for path in paths
+                info = TOML.parsefile(joinpath(path, "package.toml"))
+                msg *= " – $(info["repo"])"
+                break
             end
-            info(msg)
-            ambig = true
+            msg *= "\n"
         end
-        ambig && error("interactive package choice not yet implemented")
-        Dict(name => first(first(where[name])) for name in names)
+        info(msg)
+        ambig = true
     end
+    ambig && error("interactive package choice not yet implemented")
+    uuids = Dict(name => first(first(where[name])) for name in names)
     # find applicable package versions
     versions = Dict{String,Dict{VersionNumber,SHA1}}()
     for name in names

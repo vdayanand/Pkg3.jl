@@ -111,7 +111,7 @@ function load_manifest(env::Union{Void,String}=default_env())
     return isfile(manifest) ? convert(T, TOML.parsefile(manifest)) : T()
 end
 
-function add(pkgs::Dict{String})
+function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     names = sort!(collect(keys(pkgs)))
     where = find_registered(names)
     # check for ambiguous package names
@@ -142,8 +142,8 @@ function add(pkgs::Dict{String})
             vers = TOML.parsefile(joinpath(path, "versions.toml"))
             versions[name] = Dict{VersionNumber,SHA1}()
             for (v, d) in vers
-                ver = VersionNumber(v)
-                ver in pkgs[name] || continue
+                ver, spec = VersionNumber(v), pkgs[name]
+                (spec isa VersionNumber ? ver == spec : ver in spec) || continue
                 versions[name][ver] = SHA1(d["hash-sha1"])
             end
         end

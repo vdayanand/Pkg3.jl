@@ -18,26 +18,44 @@ function registries(depot::String)
 end
 registries() = [r for d in depots() for r in registries(d)]
 
-function parse_packages(registry::String)
-    packages_toml = joinpath(registry, "packages.toml")
-    convert(Dict{UUID,Dict{Symbol,String}}, TOML.parsefile(packages_toml))
-end
+const line_re = r"""
+    ^ \s*
+    ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})
+    \s* = \s* \{
+    \s* name \s* = \s* "([^"]*)" \s*,
+    \s* path \s* = \s* "([^"]*)" \s*,?
+    \s* \} \s* $
+"""x
 
 function find_registered(names::Vector{String})
     # name --> uuid --> paths
     where = Dict{String,Dict{UUID,Vector{String}}}()
+    isempty(names) && return where
+    names_re = let p = "\\bname\\s*=\\s*\"(?:$(names[1])"
+        for i in 2:length(names)
+            p *= "|$(names[i])"
+        end
+        p *= ")\""
+        Regex(p)
+    end
     for registry in registries()
-        for (uuid, info) in parse_packages(registry)
-            name = info[:name]
-            name in names || continue
-            if !haskey(where, name)
-                where[name] = Dict{UUID,Vector{String}}()
+        packages_file = joinpath(registry, "packages.toml")
+        open(packages_file) do io
+            for line in eachline(io)
+                ismatch(names_re, line) || continue
+                m = match(line_re, line)
+                m == nothing && error("misformated packages.toml file: $line")
+                uuid = UUID(m.captures[1])
+                name = Base.unescape_string(m.captures[2])
+                path = Base.unescape_string(m.captures[3])
+                if !haskey(where, name)
+                    where[name] = Dict{UUID,Vector{String}}()
+                end
+                if !haskey(where[name], uuid)
+                    where[name][uuid] = String[]
+                end
+                push!(where[name][uuid], abspath(registry, path))
             end
-            if !haskey(where[name], uuid)
-                where[name][uuid] = String[]
-            end
-            path = abspath(registry, info[:path])
-            push!(where[name][uuid], path)
         end
     end
     return where

@@ -141,47 +141,73 @@ end
 
 function load_manifest(env::Union{Void,String}=default_env())
     manifest = find_manifest(env)
-    T = Dict{String,Dict{String,Dict{String,String}}}
+    T = Dict{String,Dict{String,String}}
     return isfile(manifest) ? convert(T, TOML.parsefile(manifest)) : T()
 end
 
 function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     names = sort!(collect(keys(pkgs)))
-    where = find_registered(names)
-    # check for ambiguous package names
-    ambig = false
-    for name in names
-        length(where[name]) == 1 && continue
-        msg = "$name is ambiguous, it could refer to:\n"
-        for (i, (uuid, paths)) in enumerate(sort!(collect(where[name]), by=first))
-            msg *= " [$i] $uuid"
-            for path in paths
-                info = TOML.parsefile(joinpath(path, "package.toml"))
-                msg *= " – $(info["repo"])"
-                break
+    regs = find_registered(names)
+    manifest = load_manifest()
+    uuids = Dict{String,UUID}(name => info["uuid"] for (name, info) in manifest)
+    # disambiguate package names
+    let ambig = false
+        for name in names
+            if haskey(uuids, name)
+                uuid = uuids[name]
+                if haskey(regs, name)
+                    for uuid′ in collect(keys(regs[name]))
+                        uuid′ == uuid || delete!(regs[name], uuid)
+                    end
+                end
+                haskey(regs, name) && !isempty(regs[name]) && continue
+                error("""
+                $name/$uuid found in manifest but not in registries;
+                To install a different $name package `pkg rm $name` and then do `pkg add $name` again.
+                """)
+            elseif length(regs[name]) == 1
+                uuids[name] = first(first(regs[name]))
+            else
+                msg = "$name is ambiguous, it could refer to:\n"
+                for (i, (uuid, paths)) in enumerate(sort!(collect(regs[name]), by=first))
+                    msg *= " [$i] $uuid"
+                    for path in paths
+                        info = TOML.parsefile(joinpath(path, "package.toml"))
+                        msg *= " – $(info["repo"])"
+                        break
+                    end
+                    msg *= "\n"
+                end
+                info(msg)
+                ambig = true
             end
-            msg *= "\n"
         end
-        info(msg)
-        ambig = true
+        ambig && error("interactive package choice not yet implemented")
     end
-    ambig && error("interactive package choice not yet implemented")
-    uuids = Dict(name => first(first(where[name])) for name in names)
+    merge!(regs, find_registered(setdiff(keys(uuids), names)))
+    where = Dict(name => paths for (name, info) in regs for (uuid, paths) in info)
+
+    # compute reqs & deps for Pkg.Resolve.resolve
+    #  - reqs: what we need to choose versions for
+    #  - deps: relevant portion of dependency graph
+
+
     # find applicable package versions
-    versions = Dict{String,Dict{VersionNumber,SHA1}}()
+    versions = Dict{UUID,Dict{VersionNumber,SHA1}}()
     for name in names
         uuid, paths = first(where[name])
         for path in paths
             vers = TOML.parsefile(joinpath(path, "versions.toml"))
-            versions[name] = Dict{VersionNumber,SHA1}()
+            versions[uuid] = Dict{VersionNumber,SHA1}()
             for (v, d) in vers
                 ver, spec = VersionNumber(v), pkgs[name]
                 (spec isa VersionNumber ? ver == spec : ver in spec) || continue
-                versions[name][ver] = SHA1(d["hash-sha1"])
+                versions[uuid][ver] = SHA1(d["hash-sha1"])
             end
         end
     end
-    return versions
+
+    return where, versions
 end
 
 end # module

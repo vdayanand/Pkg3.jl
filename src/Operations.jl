@@ -66,26 +66,49 @@ include("libgit2_discover.jl")
 default_env() = get(ENV, "JULIA_ENV", nothing)
 find_env() = find_env(default_env())
 
+const config_names = ["JuliaConfig.toml", "Config.toml"]
+const default_envs = [
+    "v$(VERSION.major).$(VERSION.minor).$(VERSION.patch)",
+    "v$(VERSION.major).$(VERSION.minor)",
+    "v$(VERSION.major)",
+    "default",
+]
+
+function find_project_env(start_path::String = pwd())
+    path = LibGit2.discover(start_path, ceiling = homedir())
+    repo = LibGit2.GitRepo(path)
+    work = LibGit2.workdir(repo)
+    for name in config_names
+        path = abspath(work, name)
+        isfile(path) && return path
+    end
+    return abspath(work, config_names[end])
+end
+
+function find_default_env()
+    for depot in depots(), env in default_envs, name in config_names
+        path = joinpath(depot, "environments", env, name)
+        isfile(path) && return path
+    end
+    env = VERSION.major == 0 ? default_envs[2] : default_envs[3]
+    return joinpath(user_depot(), "environments", env, config_names[end])
+end
+
 function find_env(env::String)
-    names = ["JuliaConfig.toml", "Config.toml"]
-    if isempty(env) || env == "."
-        # find project environment...
-        path = LibGit2.discover(ceiling = homedir())
-        repo = LibGit2.GitRepo(path)
-        work = LibGit2.workdir(repo)
-        for name in names
-            path = abspath(work, name)
-            isfile(path) && return path
-        end
-        return abspath(work, names[end])
+    if isempty(env)
+        error("invalid environment name: \"\"")
+    elseif env == "/"
+        return find_default_env()
+    elseif env == "."
+        return find_project_env()
     elseif startswith(env, "/") || startswith(env, "./")
         # path to config file or project directory
         splitext(env)[2] == ".toml" && return abspath(env)
-        for name in names
+        for name in config_names
             path = abspath(env, name)
             isfile(path) && return path
         end
-        return abspath(env, names[end])
+        return abspath(env, config_names[end])
     else # named environment
         for depot in depots()
             path = joinpath(depot, "environments", env, "Config.toml")
@@ -96,19 +119,12 @@ function find_env(env::String)
 end
 
 function find_env(::Void)
-    # look for a default environment
-    defaults = [
-        "v$(VERSION.major).$(VERSION.minor).$(VERSION.patch)",
-        "v$(VERSION.major).$(VERSION.minor)",
-        "v$(VERSION.major)",
-        "default",
-    ]
-    for depot in depots(), env in defaults
-        path = joinpath(depot, "environments", env, "Config.toml")
-        isfile(path) && return path
+    try
+        return find_project_env()
+    catch err
+        err isa LibGit2.GitError && err.code == LibGit2.Error.ENOTFOUND || rethrow(err)
     end
-    env = VERSION.major == 0 ? defaults[2] : defaults[3]
-    return joinpath(user_depot(), "environments", env, "Config.toml")
+    return find_default_env()
 end
 
 function find_manifest(env::Union{Void,String}=default_env())

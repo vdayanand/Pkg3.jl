@@ -19,7 +19,7 @@ write_toml(prefix, "registry") do io
     println(io, "name = ", repr("Uncurated"))
     println(io, "uuid = ", repr(uuid))
     println(io, "repo = ", repr(repo))
-    println(io, "description = \"\"\"")
+    println(io, "\ndescription = \"\"\"")
     print(io, """
         Official uncurated Julia package registry where people can
         register any package they want without too much debate about
@@ -56,6 +56,18 @@ for (bucket, b_pkgs) in buckets
                 i > 1 && println(io)
                 println(io, "[", toml_key(string(ver)), "]")
                 println(io, "hash-sha1 = ", repr(v.sha1))
+            end
+        end
+        write_toml(prefix, bucket, pkg, "requirements") do io
+            for (i, (ver, v)) in enumerate(sort!(collect(p.versions), by=first))
+                length(v.requires) > 1 || continue
+                i > 1 && println(io)
+                println(io, "[", toml_key(string(ver)), "]")
+                for (req, r) in sort!(collect(v.requires), by=first)
+                    req == "julia" && continue
+                    uuid = pkgs[req].uuid
+                    println(io, toml_key(req), " = ", repr(string(uuid)))
+                end
             end
         end
     end

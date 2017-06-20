@@ -153,3 +153,4 @@ end
 ## Load package data ##
 
 const pkgs = load_packages(Pkg.dir("METADATA"))
+prune!(pkgs)

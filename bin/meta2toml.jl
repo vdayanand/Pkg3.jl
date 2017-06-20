@@ -82,6 +82,12 @@ versions_repr(v::Vector) = length(v) == 1 ? repr(versions_string(v[1])) :
 
 ## Preprocessing routines ##
 
+function packagelt(a::String, b::String)
+    a == "julia" && b != "julia" && return true
+    a != "julia" && b == "julia" && return false
+    return lowercase(a) < lowercase(b)
+end
+
 function compat_julia(p::Package)
     fwd = Dict(ver => compress_versions(v.julia, julia_versions()) for (ver, v) in p.versions)
     rev = Dict(jul => compress_versions(vers, keys(fwd)) for (jul, vers) in invert_map(fwd))
@@ -107,8 +113,8 @@ function compat_versions(p::Package, packages=Main.packages)
             nonunif[req] = sort!(collect(flatten_keys(invert_map(r))), by=first∘first)
         end
     end
-    (sort!(collect(uniform), by=lowercase∘first),
-     sort!(collect(nonunif), by=lowercase∘first))
+    (sort!(collect(uniform), by=first, lt=packagelt),
+     sort!(collect(nonunif), by=first, lt=packagelt))
 end
 
 ## Package info output routines ##

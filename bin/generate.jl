@@ -44,6 +44,8 @@ for (pkg, p) in pkgs
     push!(get!(buckets, bucket, []), (pkg, p))
 end
 
+include("meta2toml.jl")
+
 for (bucket, b_pkgs) in buckets
     for (pkg, p) in b_pkgs
         write_toml(prefix, bucket, pkg, "package") do io
@@ -67,6 +69,22 @@ for (bucket, b_pkgs) in buckets
                     req == "julia" && continue
                     uuid = pkgs[req].uuid
                     println(io, toml_key(req), " = ", repr(string(uuid)))
+                end
+            end
+        end
+        write_toml(prefix, bucket, pkg, "compatibility") do io
+            uniform, nonunif = compat_versions(p, pkgs)
+            if !isempty(uniform)
+                for (req, v) in uniform
+                    println(io, "$req = $(versions_repr(v))")
+                end
+                !isempty(nonunif) && println(io)
+            end
+            for (i, (req, r)) in enumerate(nonunif)
+                i > 1 && println(io)
+                println(io, "[$req]")
+                for (pv, rv) in sort!(collect(r), by=first∘first)
+                    println(io, versions_repr(pv), " = ", versions_repr(rv))
                 end
             end
         end

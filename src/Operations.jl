@@ -165,6 +165,7 @@ function parse_version_set(s::String)
 end
 
 function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
+    orig_pkgs = copy(pkgs)
     names = sort!(collect(keys(pkgs)))
     regs = find_registered(names)
     manifest = load_manifest()
@@ -222,10 +223,6 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     # reqs :: String --> VersionSet
     reqs = convert(Pkg.Types.Requires, pkgs)
 
-    # deps needs to contain all versions and all potential requirements
-    # except those that are already installed at a given version, which
-    # can simply be used to filter out the potential candidate versions
-
     # deps :: String --> VersionNumber --> (SHA1, String --> VersionSet)
     deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
     names = sort!(collect(keys(uuids)))
@@ -259,7 +256,26 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
         end
     end
     deps = Pkg.Query.prune_dependencies(reqs, deps)
-    want = Pkg.Resolve.resolve(reqs, deps)
+    vers = Pkg.Resolve.resolve(reqs, deps)
+
+    # find the hashes of each version
+    hashes = Dict{String,SHA1}()
+    for (name, ver) in vers
+        v = string(ver)
+        for path in where[name]
+            versions = parse_toml(path, "versions.toml")
+            haskey(versions, v) || continue
+            hash = versions[v]["hash-sha1"]
+            if haskey(hashes, name)
+                hash == hashes[name] || warn("$name: hash mismatch for version $v!")
+            else
+                hashes[name] = hash
+            end
+        end
+        @assert haskey(hashes, name)
+    end
+
+    # find the repo URLs of each package
     
 end
 

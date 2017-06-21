@@ -178,6 +178,17 @@ function parse_version_set(s::String)
     return VersionSet(lower, upper)
 end
 
+function add(names...; kwargs...)
+    pkgs = Dict{String,Union{VersionNumber,VersionSpec}}()
+    for name in names
+        pkgs[string(name)] = vs"*"
+    end
+    for (key, val) in kwargs
+        pkgs[string(key)] = val
+    end
+    return add(pkgs)
+end
+
 function add(pkgs::Dict{String})
     orig_pkgs = copy(pkgs)
     names = sort!(collect(keys(pkgs)))
@@ -331,6 +342,7 @@ function add(pkgs::Dict{String})
         end
         mkpath(version_path)
         opts = LibGit2.CheckoutOptions(
+            checkout_strategy = LibGit2.Consts.CHECKOUT_FORCE,
             target_directory = Base.unsafe_convert(Cstring, version_path)
         )
         LibGit2.checkout_tree(repo, tree, options=opts)

@@ -8,4 +8,6 @@ import .Types: VersionSpec, @vs_str
 import .Operations: add
 import .Loading: Loader, LoadInstalled
 
+export @vs_str
+
 end # module

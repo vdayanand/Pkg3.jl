@@ -258,24 +258,30 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     deps = Pkg.Query.prune_dependencies(reqs, deps)
     vers = Pkg.Resolve.resolve(reqs, deps)
 
-    # find the hashes of each version
+    # find repos and hashes for each package & version
+    repos = Dict{String,Vector{String}}()
     hashes = Dict{String,SHA1}()
     for (name, ver) in vers
+        repos[name] = String[]
         v = string(ver)
         for path in where[name]
+            package = parse_toml(path, "package.toml")
+            repo = package["repo"]
+            repo in repos[name] || push!(repos[name], repo)
             versions = parse_toml(path, "versions.toml")
-            haskey(versions, v) || continue
-            hash = versions[v]["hash-sha1"]
-            if haskey(hashes, name)
-                hash == hashes[name] || warn("$name: hash mismatch for version $v!")
-            else
-                hashes[name] = hash
+            if haskey(versions, v)
+                hash = versions[v]["hash-sha1"]
+                if haskey(hashes, name)
+                    hash == hashes[name] || warn("$name: hash mismatch for version $v!")
+                else
+                    hashes[name] = hash
+                end
             end
         end
         @assert haskey(hashes, name)
     end
+    foreach(sort!, values(repos))
 
-    # find the repo URLs of each package
     
 end
 

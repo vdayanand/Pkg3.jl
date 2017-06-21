@@ -235,7 +235,6 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
     names = sort!(collect(keys(reqs)))
     for name in names
-        @show name
         spec = get(pkgs, name, VersionSpec())
         uuid, paths = uuids[name], where[name]
         deps[name] = Dict{VersionNumber,Pkg.Types.Available}()
@@ -248,9 +247,13 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
                 r = haskey(requires, v) ?
                     Dict(dep => parse_version_set(r) for (dep, r) in requires[v]) :
                     Pkg.Types.Requires()
+                if haskey(r, "julia")
+                    VERSION in r["julia"] || continue
+                    delete!(r, "julia")
+                end
                 x = deps[name][ver] = Pkg.Types.Available(SHA1(d["hash-sha1"]), r)
                 for dep in keys(x.requires)
-                    dep in names && continue
+                    (dep in names || dep == "julia") && continue
                     found = find_registered(dep)
                     @assert length(found) == 1 # TODO: use UUIDs to disambiguate
                     uuids[dep] = first(found)[1]
@@ -260,6 +263,7 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
             end
         end
     end
+    deps = Pkg.Query.prune_dependencies(reqs, deps)
 
     # find applicable package versions
     versions = Dict{UUID,Dict{VersionNumber,SHA1}}()

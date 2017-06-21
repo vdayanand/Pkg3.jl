@@ -6,6 +6,11 @@ using Base: LibGit2
 using Base: Pkg
 using Pkg3.Types
 
+function parse_toml(path::String...; fakeit::Bool=false)
+    p = joinpath(path...)
+    !fakeit || isfile(p) ? TOML.parsefile(p) : Dict{Any,Any}()
+end
+
 user_depot() = abspath(homedir(), ".julia")
 depots() = Base.Loading.DEPOTS
 
@@ -61,6 +66,7 @@ function find_registered(names::Vector{String})
     end
     return where
 end
+find_registered(name::String) = find_registered([name])[name]
 
 include("libgit2_discover.jl")
 
@@ -130,7 +136,7 @@ end
 
 function find_manifest(env::Union{Void,String}=default_env())
     config = find_env(env)
-    isfile(config) && return abspath(TOML.parsefile(config)["manifest"])
+    isfile(config) && return abspath(parse_toml(config)["manifest"])
     names = ["JuliaManifest.toml", "Manifest.toml"]
     dir = dirname(config)
     for name in names
@@ -143,7 +149,19 @@ end
 function load_manifest(env::Union{Void,String}=default_env())
     manifest = find_manifest(env)
     T = Dict{String,Dict{String,String}}
-    return isfile(manifest) ? convert(T, TOML.parsefile(manifest)) : T()
+    return isfile(manifest) ? convert(T, parse_toml(manifest)) : T()
+end
+
+inspec(v::VersionNumber, s::VersionSpec) = v in s
+inspec(v::VersionNumber, s::VersionNumber) = v == s
+
+function parse_version_set(s::String)
+    parts = split(s, '-')
+    length(parts) == 1 && return VersionSet(VersionSpec(parts[1]))
+    length(parts) != 2 && error("invalid version spec: ", repr(s))
+    lower = VersionSet(VersionSpec(parts[1])).intervals[1].lower
+    upper = VersionSet(VersionSpec(parts[2])).intervals[1].upper
+    return VersionSet(lower, upper)
 end
 
 function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
@@ -173,7 +191,7 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
                 for (i, (uuid, paths)) in enumerate(sort!(collect(regs[name]), by=first))
                     msg *= " [$i] $uuid"
                     for path in paths
-                        info = TOML.parsefile(joinpath(path, "package.toml"))
+                        info = parse_toml(path, "package.toml")
                         msg *= " – $(info["repo"])"
                         break
                     end
@@ -197,7 +215,7 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
         # if already satisfied ignore add request, otherwise install
         # a requested version and ignore the version in the manifest
         if haskey(manifest[name], "version")
-            if VersionNumber(manifest[name]["version"]) in pkgs[name]
+            if inspec(VersionNumber(manifest[name]["version"]), pkgs[name])
                 delete!(pkgs, name)
                 continue
             end
@@ -215,27 +233,30 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
 
     # deps :: String --> VersionNumber --> (SHA1, String --> VersionSet)
     deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
-
     names = sort!(collect(keys(reqs)))
     for name in names
-        spec, uuid, paths = pkgs[name], uuids[name], where[name]
+        @show name
+        spec = get(pkgs, name, VersionSpec())
+        uuid, paths = uuids[name], where[name]
         deps[name] = Dict{VersionNumber,Pkg.Types.Available}()
-        requirements = TOML.parsefile(joinpath(path, "requirements.toml"))
-        compatibility = TOML.parsefile(joinpath(path, "compatibility.toml"))
         for path in paths
-            vers = TOML.parsefile(joinpath(path, "versions.toml"))
-            for (v, d) in vers
+            versions = parse_toml(path, "versions.toml")
+            requires = parse_toml(path, "requirements.toml", fakeit=true)
+            for (v, d) in versions
                 ver = VersionNumber(v)
-                (spec isa VersionNumber ? ver == spec : ver in spec) || continue
-                feasible = true
-                for (dep, uuid) in requirements[v]
-                    haskey(uuids, dep) && (feasible &= uuids[dep] != uuid)
-                    feasible || break
-                    dep in names || push!(names, dep)
+                inspec(ver, spec) || continue
+                r = haskey(requires, v) ?
+                    Dict(dep => parse_version_set(r) for (dep, r) in requires[v]) :
+                    Pkg.Types.Requires()
+                x = deps[name][ver] = Pkg.Types.Available(SHA1(d["hash-sha1"]), r)
+                for dep in keys(x.requires)
+                    dep in names && continue
+                    found = find_registered(dep)
+                    @assert length(found) == 1 # TODO: use UUIDs to disambiguate
+                    uuids[dep] = first(found)[1]
+                    where[dep] = first(found)[2]
+                    push!(names, dep)
                 end
-                feasible || continue
-                sha1 = SHA1(d["hash-sha1"])
-                deps[name][ver] = Available(sha1)
             end
         end
     end
@@ -245,7 +266,7 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     for name in names
         uuid, paths = first(where[name])
         for path in paths
-            vers = TOML.parsefile(joinpath(path, "versions.toml"))
+            vers = parse_toml(path, "versions.toml")
             versions[uuid] = Dict{VersionNumber,SHA1}()
             for (v, d) in vers
                 ver, spec = VersionNumber(v), pkgs[name]

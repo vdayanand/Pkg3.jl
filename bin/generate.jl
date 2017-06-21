@@ -61,7 +61,7 @@ for (bucket, b_pkgs) in buckets
             end
         end
         verv = filter(vv->!isempty(vv[end].requires), collect(p.versions))
-        !isempty(verv) && write_toml(prefix, bucket, pkg, "dependencies") do io
+        !isempty(verv) && write_toml(prefix, bucket, pkg, "requirements") do io
             for (i, (ver, v)) in enumerate(sort!(verv, by=first))
                 i > 1 && println(io)
                 println(io, "[", toml_key(string(ver)), "]")

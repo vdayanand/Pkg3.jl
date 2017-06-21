@@ -40,10 +40,13 @@ struct VersionSpec{n}
 end
 VersionSpec(spec::Integer...) = VersionSpec{length(spec)}(spec)
 
-macro vs_str(s::String)
+function Base.convert(::Type{VersionSpec}, s::AbstractString)
 	isempty(s) || s == "*" ? VersionSpec() :
 	VersionSpec(map(x->parse(Int, x), split(s, '.'))...)
 end
+
+macro vs_str(s::String); VersionSpec(s); end
+
 function Base.show(io::IO, s::VersionSpec)
 	print(io, "vs\"")
 	join(io, s.spec, '.')

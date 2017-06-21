@@ -13,8 +13,7 @@ function Base.load_hook(loader::LoadInstalled, name::String, found)
     # load and parse the package manifest
     manifest = load_manifest()
     # pull the package UUID and verion hash out of the manifest
-    packages = haskey(manifest, "package")  ? manifest["package"]  : return found
-    package  = haskey(packages, name)       ? packages[name]       : return found
+    package  = haskey(manifest, name)       ? manifest[name]       : return found
     uuid     = haskey(package, "uuid")      ? package["uuid"]      : return found
     hash     = haskey(package, "hash-sha1") ? package["hash-sha1"] : return found
     # relative path for package and version
@@ -27,6 +26,8 @@ function Base.load_hook(loader::LoadInstalled, name::String, found)
     return isfile(path) ? path : found
 end
 
+empty!(LOAD_PATH)
+ENV["JULIA_PKGDIR"] = tempname()
 @eval Base module Loading; DEPOTS = []; end
 push!(LOAD_PATH, LoadInstalled(user_depot()))
 push!(Base.Loading.DEPOTS, user_depot())

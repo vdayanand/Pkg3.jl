@@ -206,23 +206,18 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     merge!(regs, find_registered(setdiff(keys(uuids), names)))
     where = Dict(name => paths for (name, info) in regs for (uuid, paths) in info)
 
+    # copy manifest versions to pkgs
+    # if already in specified version set, leave as installed
+    for (name, info) in manifest
+        ver = VersionNumber(info["version"])
+        if !haskey(pkgs, name) || inspec(ver, pkgs[name])
+            pkgs[name] = ver
+        end
+    end
+
     # compute reqs & deps for Pkg.Resolve.resolve
     #  - reqs: what we need to choose versions for
     #  - deps: relevant portion of dependency graph
-
-    for (name, uuid) in uuids
-        haskey(pkgs, name) && haskey(manifest, name) || continue
-        # if already satisfied ignore add request, otherwise install
-        # a requested version and ignore the version in the manifest
-        if haskey(manifest[name], "version")
-            if inspec(VersionNumber(manifest[name]["version"]), pkgs[name])
-                delete!(pkgs, name)
-                continue
-            end
-        end
-        delete!(manifest, name)
-    end
-    # keys of manifest and pkgs are now disjoint
 
     # reqs :: String --> VersionSet
     reqs = convert(Pkg.Types.Requires, pkgs)
@@ -233,7 +228,7 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
 
     # deps :: String --> VersionNumber --> (SHA1, String --> VersionSet)
     deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
-    names = sort!(collect(keys(reqs)))
+    names = sort!(collect(keys(uuids)))
     for name in names
         spec = get(pkgs, name, VersionSpec())
         uuid, paths = uuids[name], where[name]
@@ -264,23 +259,8 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
         end
     end
     deps = Pkg.Query.prune_dependencies(reqs, deps)
-
-    # find applicable package versions
-    versions = Dict{UUID,Dict{VersionNumber,SHA1}}()
-    for name in names
-        uuid, paths = first(where[name])
-        for path in paths
-            vers = parse_toml(path, "versions.toml")
-            versions[uuid] = Dict{VersionNumber,SHA1}()
-            for (v, d) in vers
-                ver, spec = VersionNumber(v), pkgs[name]
-                (spec isa VersionNumber ? ver == spec : ver in spec) || continue
-                versions[uuid][ver] = SHA1(d["hash-sha1"])
-            end
-        end
-    end
-
-    return where, versions
+    want = Pkg.Resolve.resolve(reqs, deps)
+    
 end
 
 end # module

@@ -80,9 +80,10 @@ end
 include("libgit2_discover.jl")
 
 default_env() = get(ENV, "JULIA_ENV", nothing)
-find_env() = find_env(default_env())
+find_config() = find_config(default_env())
 
 const config_names = ["JuliaConfig.toml", "Config.toml"]
+const manifest_names = ["JuliaManifest.toml", "Manifest.toml"]
 const default_envs = [
     "v$(VERSION.major).$(VERSION.minor).$(VERSION.patch)",
     "v$(VERSION.major).$(VERSION.minor)",
@@ -110,7 +111,7 @@ function find_default_env()
     return joinpath(user_depot(), "environments", env, config_names[end])
 end
 
-function find_env(env::String)
+function find_config(env::String)
     if isempty(env)
         error("invalid environment name: \"\"")
     elseif env == "/"
@@ -134,7 +135,7 @@ function find_env(env::String)
     end
 end
 
-function find_env(::Void)
+function find_config(::Void)
     try
         return find_project_env()
     catch err
@@ -144,10 +145,14 @@ function find_env(::Void)
 end
 
 function find_manifest(env::Union{Void,String}=default_env())
-    config = find_env(env)
-    isfile(config) && return abspath(parse_toml(config)["manifest"])
+    config_file = find_config(env)
+    if isfile(config_file)
+        config = parse_toml(config_file)
+        haskey(config, "manifest") &&
+        return abspath(config["manifest"])
+    end
     names = ["JuliaManifest.toml", "Manifest.toml"]
-    dir = dirname(config)
+    dir = dirname(config_file)
     for name in names
         path = joinpath(dir, name)
         isfile(path) && return path
@@ -329,6 +334,29 @@ function add(pkgs::Dict{String})
             target_directory = Base.unsafe_convert(Cstring, version_path)
         )
         LibGit2.checkout_tree(repo, tree, options=opts)
+    end
+
+    # update config and manifest files
+    config_file = find_config()
+    config = parse_toml(config_file, fakeit=true)
+    if !haskey(config, "deps")
+        config["deps"] = Dict{String,String}()
+    end
+    for (name, sha1) in hashes
+        uuid = string(uuids[name])
+        version = string(vers[name])
+        config["deps"][name] = uuid
+        manifest[name] = Dict{String,String}(
+            "uuid"      => uuid,
+            "hash-sha1" => sha1,
+            "version"   => version,
+        )
+    end
+    open(config_file, "w") do io
+        TOML.print(io, config)
+    end
+    open(find_manifest(), "w") do io
+        TOML.print(io, manifest)
     end
 end
 

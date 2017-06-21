@@ -370,6 +370,7 @@ function add(pkgs::Dict{String})
             "version"   => version,
         )
     end
+    mkpath(dirname(config_file))
     info("Updating config file $config_file")
     open(config_file, "w") do io
         TOML.print(io, config, sorted=true)
@@ -379,11 +380,6 @@ function add(pkgs::Dict{String})
     open(manifest_file, "w") do io
         TOML.print(io, manifest, sorted=true)
     end
-end
-
-function hydrate()
-    pkgs = collect(keys(load_manifest()))
-    add(Dict{String,Union{VersionNumber,VersionSpec}}(pkg => vs"*" for pkg in pkgs))
 end
 
 end # module

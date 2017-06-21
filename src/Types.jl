@@ -1,6 +1,7 @@
 module Types
 
 using Base.Random: UUID
+using Base.Pkg.Types: VersionSet
 
 export SHA1, VersionSpec, @vs_str
 
@@ -55,5 +56,15 @@ Base.in(v::VersionNumber, s::VersionSpec{0}) = true
 Base.in(v::VersionNumber, s::VersionSpec{1}) = v.major == s.spec[1]
 Base.in(v::VersionNumber, s::VersionSpec{2}) = v.major == s.spec[1] && v.minor == s.spec[2]
 Base.in(v::VersionNumber, s::VersionSpec{3}) = v.major == s.spec[1] && v.minor == s.spec[2] && v.patch == s.spec[3]
+
+Base.convert(::Type{VersionSet}, s::VersionSpec{0}) = VersionSet()
+Base.convert(::Type{VersionSet}, s::VersionSpec{1}) =
+	VersionSet(VersionNumber(s[1]), VersionNumber(s[1]+1))
+Base.convert(::Type{VersionSet}, s::VersionSpec{2}) =
+	VersionSet(VersionNumber(s[1], s[2]), VersionNumber(s[1], s[2]+1))
+Base.convert(::Type{VersionSet}, s::VersionSpec{3}) =
+	VersionSet(VersionNumber(s[1], s[2], s[3]), VersionNumber(s[1], s[2], s[3]+1))
+Base.convert(::Type{VersionSet}, v::VersionNumber) =
+	VersionSet(v, Base.nextpatch(v))
 
 end # module

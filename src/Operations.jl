@@ -3,6 +3,7 @@ module Operations
 using TOML
 using Base.Random: UUID
 using Base: LibGit2
+using Base: Pkg
 using Pkg3.Types
 
 user_depot() = abspath(homedir(), ".julia")
@@ -191,6 +192,55 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     #  - reqs: what we need to choose versions for
     #  - deps: relevant portion of dependency graph
 
+    for (name, uuid) in uuids
+        haskey(pkgs, name) && haskey(manifest, name) || continue
+        # if already satisfied ignore add request, otherwise install
+        # a requested version and ignore the version in the manifest
+        if haskey(manifest[name], "version")
+            if VersionNumber(manifest[name]["version"]) in pkgs[name]
+                delete!(pkgs, name)
+                continue
+            end
+        end
+        delete!(manifest, name)
+    end
+    # keys of manifest and pkgs are now disjoint
+    reqs = convert(Pkg.Types.Requires, pkgs)
+
+    # deps needs to contain all versions and all potential requirements
+    # except those that are already installed at a given version, which
+    # can simply be used to filter out the potential candidate versions
+
+    # for each package name in reqs
+    #   for each version
+    #     add the packages it requires to the list
+    # 
+
+    # Available == Struct{SHA1,Dict{String,VersionSet}}
+    deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
+    names = sort!(collect(keys(reqs)))
+    for name in names
+        spec, uuid, paths = pkgs[name], uuids[name], where[name]
+        deps[name] = Dict{VersionNumber,Pkg.Types.Available}()
+        requirements = TOML.parsefile(joinpath(path, "requirements.toml"))
+        compatibility = TOML.parsefile(joinpath(path, "compatibility.toml"))
+        for path in paths
+            vers = TOML.parsefile(joinpath(path, "versions.toml"))
+            for (v, d) in vers
+                ver = VersionNumber(v)
+                (spec isa VersionNumber ? ver == spec : ver in spec) || continue
+                feasible = true
+                for (dep, uuid) in requirements[v]
+                    haskey(uuids, dep) && (feasible &= uuids[dep] != uuid)
+                    feasible || break
+                    dep in names || push!(names, dep)
+                end
+                feasible || continue
+                sha1 = SHA1(d["hash-sha1"])
+                deps[name][ver] = Available(sha1)
+            end
+        end
+    end
 
     # find applicable package versions
     versions = Dict{UUID,Dict{VersionNumber,SHA1}}()

@@ -205,19 +205,17 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
         delete!(manifest, name)
     end
     # keys of manifest and pkgs are now disjoint
+
+    # reqs :: String --> VersionSet
     reqs = convert(Pkg.Types.Requires, pkgs)
 
     # deps needs to contain all versions and all potential requirements
     # except those that are already installed at a given version, which
     # can simply be used to filter out the potential candidate versions
 
-    # for each package name in reqs
-    #   for each version
-    #     add the packages it requires to the list
-    # 
-
-    # Available == Struct{SHA1,Dict{String,VersionSet}}
+    # deps :: String --> VersionNumber --> (SHA1, String --> VersionSet)
     deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
+
     names = sort!(collect(keys(reqs)))
     for name in names
         spec, uuid, paths = pkgs[name], uuids[name], where[name]

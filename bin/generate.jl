@@ -60,31 +60,14 @@ for (bucket, b_pkgs) in buckets
                 println(io, "hash-sha1 = ", repr(v.sha1))
             end
         end
-        write_toml(prefix, bucket, pkg, "requirements") do io
-            for (i, (ver, v)) in enumerate(sort!(collect(p.versions), by=first))
-                length(v.requires) > 1 || continue
+        verv = filter(vv->!isempty(vv[end].requires), collect(p.versions))
+        !isempty(verv) && write_toml(prefix, bucket, pkg, "dependencies") do io
+            for (i, (ver, v)) in enumerate(sort!(verv, by=first))
                 i > 1 && println(io)
                 println(io, "[", toml_key(string(ver)), "]")
-                for (req, r) in sort!(collect(v.requires), by=first)
-                    req == "julia" && continue
-                    uuid = pkgs[req].uuid
-                    println(io, toml_key(req), " = ", repr(string(uuid)))
-                end
-            end
-        end
-        write_toml(prefix, bucket, pkg, "compatibility") do io
-            uniform, nonunif = compat_versions(p, pkgs)
-            if !isempty(uniform)
-                for (req, v) in uniform
-                    println(io, "$req = $(versions_repr(v))")
-                end
-                !isempty(nonunif) && println(io)
-            end
-            for (i, (req, r)) in enumerate(nonunif)
-                i > 1 && println(io)
-                println(io, "[$req]")
-                for (pv, rv) in sort!(collect(r), by=first∘first)
-                    println(io, versions_repr(pv), " = ", versions_repr(rv))
+                for (req, r) in sort!(collect(v.requires), by=first, lt=packagelt)
+                    vers = compress_versions(r.versions, collect(keys(pkgs[req].versions)))
+                    println(io, toml_key(req), " = ", versions_repr(vers))
                 end
             end
         end

@@ -24,6 +24,7 @@ Base.convert(::Type{SHA1}, s::String) = SHA1(hex2bytes(s))
 Base.convert(::Type{Vector{UInt8}}, hash::SHA1) = hash.bytes
 Base.convert(::Type{String}, hash::SHA1) = bytes2hex(Vector{UInt8}(hash))
 
+Base.string(hash::SHA1) = String(hash)
 Base.show(io::IO, hash::SHA1) = print(io, "SHA1(", String(hash), ")")
 Base.isless(a::SHA1, b::SHA1) = lexless(a.bytes, b.bytes)
 Base.hash(a::SHA1, h::UInt) = hash((SHA1, a.bytes), h)

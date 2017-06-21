@@ -4,6 +4,7 @@ using TOML
 using Base.Random: UUID
 using Base: LibGit2
 using Base: Pkg
+using Base.Pkg.Types: VersionSet
 using Pkg3.Types
 
 function parse_toml(path::String...; fakeit::Bool=false)
@@ -67,6 +68,14 @@ function find_registered(names::Vector{String})
     return where
 end
 find_registered(name::String) = find_registered([name])[name]
+
+function find_installed(uuid::UUID, sha1::SHA1)
+    for depot in depots()
+        path = abspath(depot, "packages", string(uuid), string(sha1))
+        ispath(path) && return path
+    end
+    return abspath(user_depot(), "packages", string(uuid), string(sha1))
+end
 
 include("libgit2_discover.jl")
 
@@ -164,7 +173,7 @@ function parse_version_set(s::String)
     return VersionSet(lower, upper)
 end
 
-function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
+function add(pkgs::Dict{String})
     orig_pkgs = copy(pkgs)
     names = sort!(collect(keys(pkgs)))
     regs = find_registered(names)
@@ -270,11 +279,11 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
             repo in repos[name] || push!(repos[name], repo)
             versions = parse_toml(path, "versions.toml")
             if haskey(versions, v)
-                hash = versions[v]["hash-sha1"]
+                sha1 = SHA1(versions[v]["hash-sha1"])
                 if haskey(hashes, name)
-                    hash == hashes[name] || warn("$name: hash mismatch for version $v!")
+                    sha1 == hashes[name] || warn("$name: hash mismatch for version $v!")
                 else
-                    hashes[name] = hash
+                    hashes[name] = sha1
                 end
             end
         end
@@ -282,7 +291,45 @@ function add(pkgs::Dict{String,<:Union{VersionNumber,VersionSpec}})
     end
     foreach(sort!, values(repos))
 
-    
+    # clone or update repos and find or create source trees
+    for (name, sha1) in hashes
+        uuid = uuids[name]
+        version_path = find_installed(uuid, sha1)
+        ispath(version_path) && continue
+        repo_path = joinpath(user_depot(), "repos", "$uuid.git")
+        urls = copy(repos[name])
+        git_hash = LibGit2.GitHash(sha1.bytes)
+        repo = ispath(repo_path) ? LibGit2.GitRepo(repo_path) :
+            LibGit2.clone(shift!(urls), repo_path, isbare=true)
+        refspecs = ["+refs/*:refs/remotes/cache/*"]
+        while !isempty(urls)
+            try
+                LibGit2.GitObject(repo, git_hash)
+                break
+            catch err
+                err isa LibGit2.GitError && err.code == LibGit2.Error.ENOTFOUND || rethrow(err)
+            end
+            LibGit2.fetch(repo, remoteurl=shift!(urls), refspecs=refspecs)
+        end
+        obj = try LibGit2.GitObject(repo, git_hash)
+        catch err
+            err isa LibGit2.GitError && err.code == LibGit2.Error.ENOTFOUND || rethrow(err)
+            error("$name: git object $(string(sha1)) could not be found")
+        end
+        tree = LibGit2.peel(LibGit2.GitTree, obj)
+        sha1′ = SHA1(string(LibGit2.GitHash(tree)))
+        if sha1 != sha1′
+            # SHA1 was a commit instead of tree
+            sha1 = hashes[name] = sha1′
+            version_path = find_installed(uuid, sha1)
+            ispath(version_path) && continue
+        end
+        mkpath(version_path)
+        opts = LibGit2.CheckoutOptions(
+            target_directory = Base.unsafe_convert(Cstring, version_path)
+        )
+        LibGit2.checkout_tree(repo, tree, options=opts)
+    end
 end
 
 end # module

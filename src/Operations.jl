@@ -372,4 +372,9 @@ function add(pkgs::Dict{String})
     end
 end
 
+function hydrate()
+    pkgs = collect(keys(load_manifest()))
+    add(Dict{String,Union{VersionNumber,VersionSpec}}(pkg => vs"*" for pkg in pkgs))
+end
+
 end # module

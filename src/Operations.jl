@@ -196,6 +196,7 @@ function add(pkgs::Dict{String})
     manifest = load_manifest()
     uuids = Dict{String,UUID}(name => info["uuid"] for (name, info) in manifest)
     # disambiguate package names
+    info("Resolving package UUIDs")
     let ambig = false
         for name in names
             if haskey(uuids, name)
@@ -248,6 +249,7 @@ function add(pkgs::Dict{String})
     # reqs :: String --> VersionSet
     reqs = convert(Pkg.Types.Requires, pkgs)
 
+    info("Resolving package versions")
     # deps :: String --> VersionNumber --> (SHA1, String --> VersionSet)
     deps = Dict{String,Dict{VersionNumber,Pkg.Types.Available}}()
     names = sort!(collect(keys(uuids)))
@@ -315,8 +317,10 @@ function add(pkgs::Dict{String})
         repo_path = joinpath(user_depot(), "repos", "$uuid.git")
         urls = copy(repos[name])
         git_hash = LibGit2.GitHash(sha1.bytes)
-        repo = ispath(repo_path) ? LibGit2.GitRepo(repo_path) :
+        repo = ispath(repo_path) ? LibGit2.GitRepo(repo_path) : begin
+            info("Cloning [$uuid] $name")
             LibGit2.clone(shift!(urls), repo_path, isbare=true)
+        end
         refspecs = ["+refs/*:refs/remotes/cache/*"]
         while !isempty(urls)
             try
@@ -325,6 +329,7 @@ function add(pkgs::Dict{String})
             catch err
                 err isa LibGit2.GitError && err.code == LibGit2.Error.ENOTFOUND || rethrow(err)
             end
+            info("Updating $name from $(urls[1])")
             LibGit2.fetch(repo, remoteurl=shift!(urls), refspecs=refspecs)
         end
         obj = try LibGit2.GitObject(repo, git_hash)
@@ -345,6 +350,7 @@ function add(pkgs::Dict{String})
             checkout_strategy = LibGit2.Consts.CHECKOUT_FORCE,
             target_directory = Base.unsafe_convert(Cstring, version_path)
         )
+        info("Installing $name at $(string(sha1))")
         LibGit2.checkout_tree(repo, tree, options=opts)
     end
 
@@ -364,11 +370,14 @@ function add(pkgs::Dict{String})
             "version"   => version,
         )
     end
+    info("Updating config file $config_file")
     open(config_file, "w") do io
-        TOML.print(io, config)
+        TOML.print(io, config, sorted=true)
     end
-    open(find_manifest(), "w") do io
-        TOML.print(io, manifest)
+    manifest_file = find_manifest()
+    info("Updating manifest file $manifest_file")
+    open(manifest_file, "w") do io
+        TOML.print(io, manifest, sorted=true)
     end
 end
 

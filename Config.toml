@@ -1,6 +1,6 @@
 name = "Pkg3"
-authors = "Stefan Karpinski <stefan@karpinski.org>"
-license = "MIT"
 repo = "https://github.com/StefanKarpinski/Pkg3.jl.git"
-desc = "The next-generation Julia package manager."
 keywords = ["package", "management"]
+license = "MIT"
+authors = "Stefan Karpinski <stefan@karpinski.org>"
+desc = "The next-generation Julia package manager."

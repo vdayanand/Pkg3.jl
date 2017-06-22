@@ -6,6 +6,9 @@ name = "Pkg3"
 repo = "https://github.com/StefanKarpinski/Pkg3.jl.git"
 
 [deps]
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
 Iterators = "a4bce56a-f44e-563f-a45f-5312daf41243"
+PicoSAT = "ff2beb65-d7cd-5ff1-a187-74671133a339"
+Polynomials = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
 SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"

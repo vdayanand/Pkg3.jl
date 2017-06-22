@@ -1,3 +1,8 @@
+[Combinatorics]
+hash-sha1 = "fbe085b6806b26b331fcc29fcbb12522b5361b3b"
+uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+version = "0.4.0"
+
 [Compat]
 hash-sha1 = "6e9c90ac34a173c2a2c179735427078b989a3bdc"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
@@ -7,6 +12,16 @@ version = "0.26.0"
 hash-sha1 = "6b5a31f893d8453ce65da5e8c25b9e125d1cdfa5"
 uuid = "a4bce56a-f44e-563f-a45f-5312daf41243"
 version = "0.3.1"
+
+[PicoSAT]
+hash-sha1 = "135cd71cbc45dd9df074bfefc6d23ed3265af4fb"
+uuid = "ff2beb65-d7cd-5ff1-a187-74671133a339"
+version = "0.2.0"
+
+[Polynomials]
+hash-sha1 = "9ab362a9a452565bb62aedd9423fd9704421b752"
+uuid = "f27b6e38-b328-58d1-80ce-0feddd5e7a45"
+version = "0.1.5"
 
 [SHA]
 hash-sha1 = "9ce386dcf6dde95a1e267e320332d192bc090fff"

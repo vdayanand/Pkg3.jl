@@ -28,9 +28,7 @@ write_toml(prefix, "registry") do io
         some amount of consideration when choosing package names.
         """)
     println(io, "\"\"\"")
-end
-
-write_toml(prefix, "packages") do io
+    println(io, "\n[packages]")
     for (pkg, p) in sort!(collect(pkgs), by=(p->p.uuid.value)∘last)
         bucket = string(uppercase(first(pkg)))
         path = joinpath(bucket, pkg)

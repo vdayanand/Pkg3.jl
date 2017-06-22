@@ -18,8 +18,7 @@ depots() = Base.Loading.DEPOTS
 function registries(depot::String)
     d = joinpath(depot, "registries")
     regs = filter!(readdir(d)) do r
-        isfile(joinpath(d, r, "registry.toml")) &&
-        isfile(joinpath(d, r, "packages.toml"))
+        isfile(joinpath(d, r, "registry.toml"))
     end
     return map(reg->joinpath(depot, "registries", reg), regs)
 end
@@ -46,8 +45,11 @@ function find_registered(names::Vector{String})
         Regex(p)
     end
     for registry in registries()
-        packages_file = joinpath(registry, "packages.toml")
+        packages_file = joinpath(registry, "registry.toml")
         open(packages_file) do io
+            for line in eachline(io)
+                ismatch(r"^\s*\[\s*packages\s*\]\s*$", line) && break
+            end
             for line in eachline(io)
                 ismatch(names_re, line) || continue
                 m = match(line_re, line)

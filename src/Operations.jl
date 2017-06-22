@@ -373,10 +373,12 @@ function add(pkgs::Dict{String})
     end
     isempty(config["deps"]) && delete!(config, "deps")
 
-    mkpath(dirname(config_file))
-    info("Updating config file $config_file")
-    open(config_file, "w") do io
-        TOML.print(io, config, sorted=true)
+    if !isempty(config) || ispath(config_file)
+        mkpath(dirname(config_file))
+        info("Updating config file $config_file")
+        open(config_file, "w") do io
+            TOML.print(io, config, sorted=true)
+        end
     end
     manifest_file = find_manifest()
     if !isempty(manifest) || ispath(manifest_file)

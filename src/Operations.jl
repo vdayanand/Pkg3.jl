@@ -317,7 +317,7 @@ function add(pkgs::Dict{String})
         uuid = uuids[name]
         version_path = find_installed(uuid, sha1)
         ispath(version_path) && continue
-        repo_path = joinpath(user_depot(), "repos", string(uuid))
+        repo_path = joinpath(user_depot(), "upstream", string(uuid))
         urls = copy(repos[name])
         git_hash = LibGit2.GitHash(sha1.bytes)
         repo = ispath(repo_path) ? LibGit2.GitRepo(repo_path) : begin

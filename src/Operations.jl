@@ -231,7 +231,8 @@ function add(pkgs::Dict{String})
         ambig && error("interactive package choice not yet implemented")
     end
     merge!(regs, find_registered(setdiff(keys(uuids), names)))
-    where = Dict(name => paths for (name, info) in regs for (uuid, paths) in info)
+    where = isempty(regs) ? Dict{String,Vector{String}}() :
+        Dict(name => paths for (name, info) in regs for (uuid, paths) in info)
 
     # copy manifest versions to pkgs
     # if already in specified version set, leave as installed
@@ -370,15 +371,19 @@ function add(pkgs::Dict{String})
             "version"   => version,
         )
     end
+    isempty(config["deps"]) && delete!(config, "deps")
+
     mkpath(dirname(config_file))
     info("Updating config file $config_file")
     open(config_file, "w") do io
         TOML.print(io, config, sorted=true)
     end
     manifest_file = find_manifest()
-    info("Updating manifest file $manifest_file")
-    open(manifest_file, "w") do io
-        TOML.print(io, manifest, sorted=true)
+    if !isempty(manifest) || ispath(manifest_file)
+        info("Updating manifest file $manifest_file")
+        open(manifest_file, "w") do io
+            TOML.print(io, manifest, sorted=true)
+        end
     end
 end
 
